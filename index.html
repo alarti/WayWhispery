@@ -108,8 +108,13 @@
                 <!-- Guide list will be populated from Supabase -->
             </div>
             <hr>
-            <!-- This button will only be visible to editors -->
-            <button id="create-new-guide-btn" class="btn-modern btn-modern-success hidden">Create a New Guide</button>
+            <div id="editor-actions" class="text-center">
+                <p class="text-muted">Are you an editor?</p>
+                <div id="welcome-auth-container">
+                    <!-- Login button will be rendered here if not logged in -->
+                </div>
+                <button id="create-new-guide-btn" class="btn-modern btn-modern-success hidden mt-2">Create a New Guide</button>
+            </div>
         </div>
     </div>
 

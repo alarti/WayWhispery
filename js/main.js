@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Guide Catalog
     const guideCatalogList = document.getElementById('guide-catalog-list');
     const createNewGuideBtn = document.getElementById('create-new-guide-btn');
+    const welcomeAuthContainer = document.getElementById('welcome-auth-container');
     createNewGuideBtn.addEventListener('click', createNewGuide);
 
     // -----------------------------------------------------------------------------
@@ -146,10 +147,14 @@ document.addEventListener('DOMContentLoaded', () => {
             authContainer.innerHTML = '<button id="login-btn" class="btn-modern btn-modern-primary">Login with Google</button>';
             authContainer.querySelector('#login-btn').addEventListener('click', loginWithGoogle);
             userInfo.classList.add('hidden');
+
+            welcomeAuthContainer.innerHTML = '<button id="welcome-login-btn" class="btn-modern btn-modern-secondary">Login to Create/Edit</button>';
+            welcomeAuthContainer.querySelector('#welcome-login-btn').addEventListener('click', loginWithGoogle);
         }
 
         // Show/hide editor controls
         createNewGuideBtn.classList.toggle('hidden', !isEditor);
+        welcomeAuthContainer.classList.toggle('hidden', isEditor || !!currentUser);
         // We will toggle more editor controls later in setMode()
     }
 
