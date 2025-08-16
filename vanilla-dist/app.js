@@ -4,8 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // -----------------------------------------------------------------------------
 // Configuración de Supabase
 // -----------------------------------------------------------------------------
-const SUPABASE_URL = 'https://<ID-DE-PROYECTO-SUPABASE>.supabase.co';
-const SUPABASE_ANON_KEY = '<TU-CLAVE-ANON-PUBLICA>';
+const SUPABASE_URL = 'https://whfcesalellvnrbdcsbb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndoZmNlc2FsZWxsdm5yYmRjc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNTY0NDMsImV4cCI6MjA3MDkzMjQ0M30.wjzU9y1pudSctnLxaIIAfG8FKbMalLbKU4rto99vP9E';
 
 if (SUPABASE_URL.includes('ID-DE-PROYECTO') || SUPABASE_ANON_KEY.includes('TU-CLAVE')) {
     alert('Error: Debes configurar las variables SUPABASE_URL y SUPABASE_ANON_KEY en app.js');
