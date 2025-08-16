@@ -43,7 +43,9 @@ CREATE TABLE guide_sections (
     guide_id uuid REFERENCES guides(id) ON DELETE CASCADE NOT NULL,
     "order" INTEGER DEFAULT 0,
     title TEXT,
-    body_md TEXT
+    body_md TEXT,
+    lat DOUBLE PRECISION,
+    lon DOUBLE PRECISION
 );
 
 -- -----------------------------------------------------------------------------
@@ -161,8 +163,15 @@ CREATE POLICY "Allow public read on sections of published guides" ON guide_secti
 FOR SELECT USING (
   (SELECT status FROM guides WHERE id = guide_id) = 'published'
 );
-CREATE POLICY "Allow editor/admin full access on sections" ON guide_sections
-FOR ALL USING (get_user_role() IN ('editor', 'admin'));
+
+CREATE POLICY "Allow full access for editors/admins on sections" ON guide_sections
+FOR ALL USING (
+    (get_user_role() IN ('editor', 'admin')) OR
+    (auth.uid() = (SELECT author_id FROM guides WHERE id = guide_id))
+) WITH CHECK (
+    (get_user_role() IN ('editor', 'admin')) OR
+    (auth.uid() = (SELECT author_id FROM guides WHERE id = guide_id))
+);
 
 -- tags
 CREATE POLICY "Allow public read access on tags" ON tags FOR SELECT USING (true);
@@ -208,19 +217,20 @@ CREATE TRIGGER on_auth_user_created
 -- Opcional: Descomentar para insertar datos de prueba.
 -- Asegúrate de que existe un usuario con el rol 'editor' para asignarlo como autor.
 
--- WITH editor AS (
---   SELECT id FROM auth.users LIMIT 1
--- ),
--- new_guide AS (
---   INSERT INTO guides (slug, title, summary, language, status, author_id)
---   VALUES ('alhambra-general', 'Guía General de la Alhambra', 'Un recorrido completo por el monumento.', 'es', 'published', (SELECT id FROM editor))
---   RETURNING id
--- )
--- INSERT INTO guide_sections (guide_id, "order", title, body_md)
--- VALUES
---   ((SELECT id FROM new_guide), 1, 'Palacios Nazaríes', 'El corazón de la Alhambra...'),
---   ((SELECT id FROM new_guide), 2, 'Generalife', 'Los jardines de descanso del sultán...'),
---   ((SELECT id FROM new_guide), 3, 'Alcazaba', 'La zona militar y más antigua...');
+WITH editor AS (
+  SELECT id FROM auth.users LIMIT 1
+),
+new_guide AS (
+  INSERT INTO guides (slug, title, summary, language, status, author_id, cover_url, initial_lat, initial_lon, initial_zoom)
+  VALUES ('alhambra-general', 'Guía Esencial de la Alhambra', 'Un recorrido completo por el monumento nazarí.', 'es', 'published', (SELECT id FROM editor), 'https://images.unsplash.com/photo-1589920038833-2457106fe3a2?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1740&q=80', 37.1773, -3.5986, 15)
+  RETURNING id
+)
+INSERT INTO guide_sections (guide_id, "order", title, body_md, lat, lon)
+VALUES
+  ((SELECT id FROM new_guide), 1, 'Introducción Histórica', 'La Alhambra, cuyo nombre significa "la fortaleza roja" en árabe, es un complejo palaciego y fortaleza.', 37.176, -3.590),
+  ((SELECT id FROM new_guide), 2, 'La Alcazaba', 'La zona militar y más antigua del complejo.', 37.177, -3.592),
+  ((SELECT id FROM new_guide), 3, 'Palacios Nazaríes', 'El corazón de la Alhambra y la joya del arte nazarí.', 37.1775, -3.590),
+  ((SELECT id FROM new_guide), 4, 'El Generalife', 'La villa con jardines utilizada por los sultanes como lugar de retiro y descanso.', 37.178, -3.588);
 
 -- -----------------------------------------------------------------------------
 -- Políticas para el Almacenamiento (Storage)

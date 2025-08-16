@@ -1,81 +1,117 @@
-# WayWisper - Versión Vanilla JS + Supabase
+# WayWhispery - Interactive Guide Platform
 
-Este proyecto es una versión "solo frontend" de la aplicación WayWisper, diseñada para ser desplegada como un sitio estático en plataformas como GitHub Pages. Utiliza HTML, CSS y JavaScript "vanilla" (sin frameworks de compilación) y se conecta directamente a [Supabase](https://supabase.com) para la autenticación, base de datos y almacenamiento de archivos.
+This project is an advanced, offline-first Progressive Web App (PWA) that serves as a platform for creating, sharing, and experiencing interactive, multilingual voice guides for any location worldwide. It combines a Leaflet.js map interface with a Supabase backend for data persistence and authentication.
 
-La versión original, una PWA con funcionalidades de mapa interactivo, se ha conservado en el fichero `README_PWA.md`.
+## Features
 
-## Características
-
--   **Sitio Estático**: Rápido, seguro y fácil de desplegar.
--   **Backend con Supabase**:
+-   **Unified Experience**: A single interface for both viewing and editing guides.
+-   **Interactive Map**: Displays a dynamic, zoomable map using Leaflet.js and OpenStreetMap.
+-   **Real-time GPS Tracking**: Uses the browser's Geolocation API to track your position.
+-   **Proximity-Based Audio Guide**: Approaching a Point of Interest (POI) automatically triggers a spoken description using the Web Speech API.
+-   **Backend with Supabase**:
     -   **Autenticación**: Login con Google (OAuth).
-    -   **Base de Datos**: PostgreSQL con políticas de seguridad a nivel de fila (RLS).
-    -   **Almacenamiento**: Gestión de imágenes de portada para las guías.
+    -   **Base de Datos**: PostgreSQL with RLS for storing guide and POI data.
+    -   **Almacenamiento**: (Future) For managing guide-related media.
 -   **Roles de Usuario**:
-    -   **Visitante (anónimo)**: Puede ver todas las guías publicadas.
-    -   **Viewer (registrado)**: Rol base para usuarios autenticados.
-    -   **Editor/Admin**: Puede crear, editar, publicar y eliminar guías.
--   **Despliegue Continuo**: Automatizado con GitHub Actions para publicar en GitHub Pages.
+    -   **Visitor (anonymous)**: Can view all published guides on the map.
+    -   **Editor/Admin**: Can create, edit, and delete guides and POIs directly on the map.
+-   **Offline First (PWA)**: Fully functional without an internet connection after the first visit.
 
-## Cómo Ponerlo en Marcha
+## How to Set Up
 
-### 1. Configuración de Supabase
+### 1. Supabase Configuration
 
-Necesitarás una cuenta de Supabase para actuar como backend. Sigue las instrucciones detalladas en la guía de configuración:
+You will need a Supabase project to act as the backend.
 
-**➡️ [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md)**
+1.  **Create a project** on [Supabase](https://supabase.com).
+2.  **Get your API keys**: In your project dashboard, go to `Settings` -> `API` and find your URL and `anon` public key.
+3.  **Configure Auth**: Go to `Authentication` -> `Providers` and enable Google. You will need to get OAuth credentials from the Google Cloud Console. For local development, make sure to add `http://localhost:8000` (or your local server's address) to the "Redirect URLs" under `Authentication` -> `URL Configuration`.
+4.  **Run the database migration**: Go to the `SQL Editor` in your Supabase dashboard, copy the content from `supabase/migrations/0001_init.sql`, and run it to create the necessary tables and policies.
 
-Esta guía te explicará cómo:
-- Crear un proyecto en Supabase.
-- Obtener tu URL y tu clave `anon` pública.
-- Configurar la autenticación con Google OAuth.
-- Crear el bucket de almacenamiento.
+### 2. Configure Local Keys
 
-### 2. Aplicar las Migraciones de Base de Datos
+The application needs to know your Supabase URL and key.
 
-Una vez creado tu proyecto de Supabase, necesitas crear las tablas y políticas de seguridad.
-
-1.  Copia el contenido del fichero `supabase/migrations/0001_init.sql`.
-2.  Ve a tu panel de Supabase, entra en el **SQL Editor**.
-3.  Pega el contenido del script y haz clic en **"RUN"**.
-
-### 3. Configurar las Claves en la Aplicación
-
-La aplicación cliente necesita conocer la URL y la clave anónima de tu proyecto de Supabase.
-
-1.  Abre el fichero `vanilla-dist/app.js`.
-2.  Busca las siguientes líneas al principio del fichero:
+1.  Open the `js/main.js` file.
+2.  Find the following lines at the top of the file:
     ```javascript
-    const SUPABASE_URL = 'https://<ID-DE-PROYECTO-SUPABASE>.supabase.co';
-    const SUPABASE_ANON_KEY = '<TU-CLAVE-ANON-PUBLICA>';
+    const SUPABASE_URL = '...';
+    const SUPABASE_ANON_KEY = '...';
     ```
-3.  Reemplaza los valores de los placeholders con tu propia URL y clave anónima que obtuviste en el primer paso.
+3.  Replace the placeholder values with your own URL and `anon` key.
 
-### 4. Ejecutar Localmente
+### 3. Run Locally
 
-Para probar el sitio en tu máquina local:
+To test the site on your local machine, you need a simple web server.
 
-1.  Necesitas un servidor web simple para servir los ficheros estáticos. Si tienes Python instalado, puedes usar:
+1.  If you have Python installed, you can run the following command from the project's root directory:
     ```bash
-    # Navega a la carpeta raíz del proyecto
-    cd /ruta/a/Alhambra-guide
-    # Inicia un servidor en la carpeta vanilla-dist en el puerto 8080
-    python3 -m http.server 8080 --directory vanilla-dist
+    python3 -m http.server 8000
     ```
-2.  Abre tu navegador y ve a `http://localhost:8080`.
+2.  Open your browser and navigate to `http://localhost:8000`.
 
-**¡Importante!** Recuerda añadir `http://localhost:8080` a tus URLs de redirección en Supabase para que el login con Google funcione localmente.
+## Database Schema
 
-## Despliegue
+The application uses a Supabase backend. The database schema is defined in `supabase/migrations/0001_init.sql`. Here is a breakdown of the tables and their fields:
 
-El despliegue en GitHub Pages está automatizado. Cada vez que se realiza un `push` a la rama `main`, una GitHub Action se encarga de publicar el contenido de la carpeta `vanilla-dist`.
+### `profiles`
 
-Consulta la guía de publicación para más detalles:
-**➡️ [`docs/PUBLISHING.md`](./docs/PUBLISHING.md)**
+This table stores public user data, including their role.
 
-## Documentación Adicional
+- `id` (uuid, primary key): References `auth.users(id)`.
+- `email` (text, unique): The user's email address.
+- `role` (text, default: 'viewer'): The user's role, which can be `viewer`, `editor`, or `admin`.
+- `created_at` (timestamptz): The timestamp of when the profile was created.
+- `updated_at` (timestamptz): The timestamp of the last profile update.
 
--   **Autenticación**: [`docs/README_AUTH.md`](./docs/README_AUTH.md)
--   **Base de Datos y RLS**: [`docs/README_DB.md`](./docs/README_DB.md)
--   **Almacenamiento**: [`docs/README_STORAGE.md`](./docs/README_STORAGE.md)
--   **Resolución de Problemas**: [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)
+### `guides`
+
+This table contains the main information for each guide.
+
+- `id` (uuid, primary key): A unique identifier for the guide.
+- `slug` (text, unique): A user-friendly URL slug for the guide.
+- `title` (text): The title of the guide.
+- `summary` (text): A short summary of the guide.
+- `language` (text): The language of the guide.
+- `cover_url` (text): A URL for the guide's cover image.
+- `status` (text, default: 'draft'): The status of the guide, which can be `draft` or `published`.
+- `author_id` (uuid): References the `id` of the author in the `auth.users` table.
+- `created_at` (timestamptz): The timestamp of when the guide was created.
+- `updated_at` (timestamptz): The timestamp of the last guide update.
+
+### `guide_sections`
+
+This table stores the content sections of a guide in order. These also serve as the Points of Interest (POIs) on the map.
+
+- `id` (uuid, primary key): A unique identifier for the section.
+- `guide_id` (uuid): References the `id` of the guide this section belongs to.
+- `order` (integer, default: 0): The order in which the section appears in the guide.
+- `title` (text): The title of the section/POI.
+- `body_md` (text): The content of the section in Markdown format.
+- `lat` (double precision): The latitude of the POI.
+- `lon` (double precision): The longitude of the POI.
+
+### `tags`
+
+This table defines the tags that can be associated with guides.
+
+- `id` (uuid, primary key): A unique identifier for the tag.
+- `name` (text, unique): The name of the tag.
+- `slug` (text, unique): A user-friendly URL slug for the tag.
+
+### `guide_tags`
+
+This is a join table for the many-to-many relationship between guides and tags.
+
+- `guide_id` (uuid): References the `id` of the guide.
+- `tag_id` (uuid): References the `id` of the tag.
+
+### `media`
+
+This table stores references to media files associated with a guide.
+
+- `id` (uuid, primary key): A unique identifier for the media file.
+- `guide_id` (uuid): References the `id` of the guide this media file belongs to.
+- `url` (text): The URL of the media file.
+- `alt` (text): Alternative text for the media file (for accessibility).
+- `kind` (text): The type of media, e.g., 'image', 'video'.

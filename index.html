@@ -1,15 +1,17 @@
-<!-- Author: Alberto Arce, Arcasoft -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alhambra and Generalife, Granada</title>
+    <title>WayWhispery</title>
 
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Leaflet Map Support -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- PWA Support -->
     <link rel="manifest" href="manifest.json">
@@ -18,7 +20,7 @@
     <!-- Apple-specific meta tags for PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Alhambra Guide">
+    <meta name="apple-mobile-web-app-title" content="WayWhispery">
     <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
 </head>
 <body>
@@ -28,14 +30,25 @@
     <div id="side-panel">
         <button id="panel-toggle-btn">☰</button>
         <div class="panel-content">
-            <h1 id="guide-title">Alhambra and Generalife, Granada</h1>
+            <h1 id="guide-title">WayWhispery</h1>
+
+            <!-- Auth Section -->
+            <div id="auth-section">
+                <div id="auth-container">
+                    <!-- Login/logout button will be rendered here -->
+                </div>
+                <div id="user-info" class="hidden">
+                    <p>User: <span id="user-email"></span> (<span id="user-role"></span>)</p>
+                </div>
+            </div>
+            <hr>
+
             <div id="guide-meta-container" class="hidden">
                 <p class="text-muted mb-2">by <span id="author-name"></span></p>
                 <a id="donation-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-modern btn-modern-secondary btn-modern-sm">
                     Support the author ☕
                 </a>
             </div>
-            <hr>
             
             <div class="mb-3">
                 <label for="language-selector" class="form-label">Language</label>
@@ -55,6 +68,7 @@
             </div>
             <hr>
 
+            <!-- Editor controls will be dynamically shown/hidden here -->
             <div id="mode-controls" class="d-grid gap-2">
                 <!-- This will be populated by JS -->
             </div>
@@ -85,24 +99,27 @@
         </div>
     </div>
 
-    <div id="welcome-modal" class="modal-overlay"> <!-- Initially visible -->
+    <!-- Welcome modal to select a guide -->
+    <div id="welcome-modal" class="modal-overlay">
         <div class="modal-content">
-            <h2>Welcome to the Interactive Guide</h2>
-            <p>Choose a featured guide or create your own.</p>
+            <h2>Welcome to WayWhispery</h2>
+            <p>Choose a featured guide or create your own (as an editor).</p>
             <div id="guide-catalog-list" class="list-group my-3">
-                <!-- Guide list will be populated here -->
+                <!-- Guide list will be populated from Supabase -->
             </div>
             <hr>
-            <button id="create-new-guide-btn" class="btn-modern btn-modern-success">Create a New Guide</button>
+            <!-- This button will only be visible to editors -->
+            <button id="create-new-guide-btn" class="btn-modern btn-modern-success hidden">Create a New Guide</button>
         </div>
     </div>
 
+    <!-- About Modal -->
     <div id="about-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <button class="modal-close-btn">&times;</button>
-            <h2>About Alhambra Voice Guide</h2>
+            <h2>About WayWhispery</h2>
             <p>This application was developed by Alberto Arce.</p>
-            <p>An interactive audio guide to explore the wonders of the Alhambra.</p>
+            <p>An interactive audio guide to explore the wonders of the world.</p>
             <p>
                 <a href="https://github.com/alarti" target="_blank" rel="noopener noreferrer">View on GitHub</a>
             </p>
@@ -114,6 +131,6 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="js/main.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
