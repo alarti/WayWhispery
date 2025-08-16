@@ -66,6 +66,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const welcomeAuthContainer = document.getElementById('welcome-auth-container');
     createNewGuideBtn.addEventListener('click', createNewGuide);
 
+    // Form Modal
+    const formModal = document.getElementById('form-modal');
+    const formModalTitle = document.getElementById('form-modal-title');
+    const formModalContent = document.getElementById('form-modal-content');
+    const formModalCloseBtn = formModal.querySelector('.modal-close-btn');
+
     // -----------------------------------------------------------------------------
     // Application State
     // -----------------------------------------------------------------------------
@@ -374,6 +380,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -----------------------------------------------------------------------------
+    // Modal System
+    // -----------------------------------------------------------------------------
+    function showFormModal(title, formHTML, submitCallback) {
+        formModalTitle.textContent = title;
+        formModalContent.innerHTML = formHTML;
+        formModal.classList.remove('hidden');
+
+        const form = formModalContent.querySelector('form');
+
+        function handleSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            if (submitCallback(data)) {
+                hideFormModal();
+            }
+        }
+
+        form.addEventListener('submit', handleSubmit);
+
+        formModalCloseBtn.onclick = () => hideFormModal();
+    }
+
+    function hideFormModal() {
+        formModal.classList.add('hidden');
+        formModalContent.innerHTML = ''; // Clean up
+    }
+
+
+    // -----------------------------------------------------------------------------
     // Edit Mode & CRUD
     // -----------------------------------------------------------------------------
     function setMode(mode) {
@@ -468,46 +504,72 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function onMapClick(e) {
-        if (!isAddingPoi) { // For now, we are always in "add poi" mode in edit mode
-            const { lat, lng } = e.latlng;
-            const poiName = prompt(`Enter name for new POI:`);
-            if (!poiName) return;
+        if (!isEditMode) return;
+        const { lat, lng } = e.latlng;
 
+        const formHTML = `
+            <form id="poi-form">
+                <input type="hidden" name="lat" value="${lat}">
+                <input type="hidden" name="lon" value="${lng}">
+                <div class="form-group">
+                    <label for="name">POI Name</label>
+                    <input type="text" name="name" id="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea name="description" id="description" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn-modern btn-modern-primary">Add POI</button>
+            </form>
+        `;
+
+        showFormModal('Add New Point of Interest', formHTML, (data) => {
             const newPoi = {
                 id: `temp-${Date.now()}`, // Temporary ID
-                lat: lat,
-                lon: lng,
-                name: poiName,
-                description: '',
-                texts: { [currentLang]: { name: poiName, description: '' } }
+                lat: parseFloat(data.lat),
+                lon: parseFloat(data.lon),
+                name: data.name,
+                description: data.description,
+                texts: { [currentLang]: { name: data.name, description: data.description } }
             };
             pois.push(newPoi);
+            tourRoute.push(newPoi.id);
             renderPois();
-        renderPoiList();
-        }
+            renderPoiList();
+            drawTourRoute();
+            return true;
+        });
+    }
 
     function editPoi(poiId) {
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
 
-        const newName = prompt(`Enter new name for "${poi.name}":`, poi.name);
-        if (newName) {
-            poi.name = newName;
-            if (poi.texts[currentLang]) {
-                poi.texts[currentLang].name = newName;
-            }
-        }
+        const formHTML = `
+            <form id="poi-form">
+                <div class="form-group">
+                    <label for="name">POI Name</label>
+                    <input type="text" name="name" id="name" value="${poi.name}" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea name="description" id="description" rows="3">${poi.description}</textarea>
+                </div>
+                <button type="submit" class="btn-modern btn-modern-primary">Save Changes</button>
+            </form>
+        `;
 
-        const newDescription = prompt(`Enter new description:`, poi.description);
-        if (newDescription) {
-            poi.description = newDescription;
+        showFormModal('Edit Point of Interest', formHTML, (data) => {
+            poi.name = data.name;
+            poi.description = data.description;
             if (poi.texts[currentLang]) {
-                poi.texts[currentLang].description = newDescription;
+                poi.texts[currentLang].name = data.name;
+                poi.texts[currentLang].description = data.description;
             }
-        }
-
-        renderPois();
-        renderPoiList();
+            renderPois();
+            renderPoiList();
+            return true;
+        });
     }
 
     function deletePoi(poiId) {
@@ -521,36 +583,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function createNewGuide() {
-        const title = prompt("Enter a title for the new guide:");
-        if (!title) return;
+        const formHTML = `
+            <form id="new-guide-form">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" name="title" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="slug">URL Slug</label>
+                    <input type="text" name="slug" id="slug" required pattern="[a-z0-9-]+">
+                    <small>e.g., 'my-awesome-guide-slug'</small>
+                </div>
+                <div class="form-group">
+                    <label for="summary">Summary</label>
+                    <textarea name="summary" id="summary" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn-modern btn-modern-primary">Create Guide</button>
+            </form>
+        `;
 
-        const slug = prompt("Enter a URL slug (e.g., 'my-new-guide'):");
-        if (!slug) return;
+        showFormModal('Create a New Guide', formHTML, async (data) => {
+            const { data: guideData, error } = await supabase
+                .from('guides')
+                .insert({
+                    ...data,
+                    language: 'es', // Default language
+                    author_id: currentUser.id,
+                    status: 'draft',
+                    initial_lat: map.getCenter().lat,
+                    initial_lon: map.getCenter().lng,
+                    initial_zoom: map.getZoom()
+                })
+                .select()
+                .single();
 
-        const summary = prompt("Enter a short summary:");
+            if (error) {
+                alert(`Error creating guide: ${error.message}`);
+                return false; // Keep modal open
+            }
 
-        const { data, error } = await supabase
-            .from('guides')
-            .insert({
-                title,
-                slug,
-                summary,
-                language: 'es', // Default language
-                author_id: currentUser.id,
-                status: 'draft',
-                initial_lat: map.getCenter().lat,
-                initial_lon: map.getCenter().lng,
-                initial_zoom: map.getZoom()
-            })
-            .select()
-            .single();
-
-        if (error) {
-            alert(`Error creating guide: ${error.message}`);
-            return;
-        }
-
-        loadGuide(data.slug);
+            loadGuide(guideData.slug).then(() => {
+                setMode('edit');
+            });
+            return true; // Close modal
+        });
     }
 
     async function saveGuide() {

@@ -2,22 +2,34 @@
 
 /* --- Theming using CSS Variables --- */
 :root {
+    /* New WayWhispery Palette */
+    --ww-green-light: #66CDAA; /* Medium Aquamarine */
+    --ww-green-dark: #20B2AA; /* Light Sea Green */
+    --ww-bg-dark: #1A3A3A; /* Dark Slate Gray (approximated) */
+    --ww-text-light: #E0FFFF; /* Light Cyan */
+    --ww-accent-yellow: #FFD700; /* Gold */
+
+    /* Theming using new palette */
     --bg-color: #121212;
-    --panel-bg-color: rgba(26, 26, 26, 0.9);
+    --panel-bg-color: rgba(26, 40, 40, 0.9);
     --panel-border-color: #333;
-    --text-color-primary: #e0e0e0;
-    --text-color-secondary: #bbb;
+    --text-color-primary: var(--ww-text-light);
+    --text-color-secondary: #aaa;
     --text-color-heading: #ffffff;
     --hr-color: #444;
     --form-bg-color: #333;
     --form-border-color: #555;
-    --list-item-hover-bg: rgba(255, 255, 255, 0.1);
-    --list-item-visited-bg: rgba(40, 167, 69, 0.2);
-    --btn-primary-bg: #0d6efd;
-    --btn-secondary-bg: #6c757d;
-    --btn-success-bg: #198754;
-    --btn-warning-bg: #ffc107;
-    --btn-danger-bg: #dc3545;
+    --list-item-hover-bg: rgba(102, 205, 170, 0.1);
+    --list-item-visited-bg: rgba(102, 205, 170, 0.2);
+
+    /* Button Colors */
+    --btn-primary-bg: var(--ww-green-dark);
+    --btn-primary-hover-bg: var(--ww-green-light);
+    --btn-secondary-bg: #4A5568;
+    --btn-secondary-hover-bg: #2D3748;
+    --btn-success-bg: var(--ww-green-dark);
+    --btn-warning-bg: #D69E2E;
+    --btn-danger-bg: #C53030;
 }
 
 [data-theme='light'] {
@@ -281,23 +293,59 @@ hr {
 }
 
 .btn-modern-primary {
-    background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+    background: var(--btn-primary-bg);
+}
+.btn-modern-primary:hover {
+    background: var(--btn-primary-hover-bg);
 }
 
 .btn-modern-success {
-    background: linear-gradient(45deg, #198754, #20c997);
+    background: var(--btn-success-bg);
 }
 
 .btn-modern-secondary {
-    background: linear-gradient(45deg, #6c757d, #adb5bd);
+    background: var(--btn-secondary-bg);
+}
+.btn-modern-secondary:hover {
+    background: var(--btn-secondary-hover-bg);
 }
 
 .btn-modern-danger {
-    background: linear-gradient(45deg, #dc3545, #ff416c);
+    background: var(--btn-danger-bg);
 }
 
 .btn-modern-sm {
     padding: 5px 12px;
     font-size: 0.8rem;
     border-radius: 15px;
+}
+
+/* --- Form & Modal Styles --- */
+.form-group {
+    margin-bottom: 1rem;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-color-secondary);
+    font-weight: bold;
+}
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--form-border-color);
+    background-color: var(--form-bg-color);
+    color: var(--text-color-primary);
+    box-sizing: border-box; /* Important */
+}
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--text-color-secondary);
+}
+#form-modal-content .btn-modern {
+    margin-top: 1rem;
 }
