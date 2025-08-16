@@ -204,7 +204,13 @@ function renderSectionInput(section = {}) {
 // Funciones de Carga y Guardado de Datos (CRUD)
 // -----------------------------------------------------------------------------
 async function fetchGuides(append = false) {
-    let query = supabase.from('guides').select('*, guide_tags!inner(tags!inner(slug))', { count: 'exact' }).eq('status', 'published');
+    let query = supabase.from('guides').select('*, guide_tags!inner(tags!inner(slug))', { count: 'exact' });
+
+    const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+    if (!isEditor) {
+        query = query.eq('status', 'published');
+    }
+
     if (currentFilters.language !== 'all') query = query.eq('language', currentFilters.language);
     if (currentFilters.tag !== 'all') query = query.eq('guide_tags.tags.slug', currentFilters.tag);
 
