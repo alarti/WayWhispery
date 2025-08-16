@@ -1,6 +1,6 @@
-# WayWisper - Versión Vanilla JS + Supabase
+# WayWhisper - Versión Vanilla JS + Supabase
 
-Este proyecto es una versión "solo frontend" de la aplicación WayWisper, diseñada para ser desplegada como un sitio estático en plataformas como GitHub Pages. Utiliza HTML, CSS y JavaScript "vanilla" (sin frameworks de compilación) y se conecta directamente a [Supabase](https://supabase.com) para la autenticación, base de datos y almacenamiento de archivos.
+Este proyecto es una versión "solo frontend" de la aplicación WayWhisper, diseñada para ser desplegada como un sitio estático en plataformas como GitHub Pages. Utiliza HTML, CSS y JavaScript "vanilla" (sin frameworks de compilación) y se conecta directamente a [Supabase](https://supabase.com) para la autenticación, base de datos y almacenamiento de archivos.
 
 La versión original, una PWA con funcionalidades de mapa interactivo, se ha conservado en el fichero `README_PWA.md`.
 
@@ -43,7 +43,7 @@ Una vez creado tu proyecto de Supabase, necesitas crear las tablas y políticas 
 
 La aplicación cliente necesita conocer la URL y la clave anónima de tu proyecto de Supabase.
 
-1.  Abre el fichero `vanilla-dist/app.js`.
+1.  Abre el fichero `js/main.js`.
 2.  Busca las siguientes líneas al principio del fichero:
     ```javascript
     const SUPABASE_URL = 'https://<ID-DE-PROYECTO-SUPABASE>.supabase.co';
@@ -59,12 +59,12 @@ Para probar el sitio en tu máquina local:
     ```bash
     # Navega a la carpeta raíz del proyecto
     cd /ruta/a/Alhambra-guide
-    # Inicia un servidor en la carpeta vanilla-dist en el puerto 8080
-    python3 -m http.server 8080 --directory vanilla-dist
+    # Inicia un servidor en el puerto 8000
+    python3 -m http.server 8000
     ```
-2.  Abre tu navegador y ve a `http://localhost:8080`.
+2.  Abre tu navegador y ve a `http://localhost:8000`.
 
-**¡Importante!** Recuerda añadir `http://localhost:8080` a tus URLs de redirección en Supabase para que el login con Google funcione localmente.
+**¡Importante!** Recuerda añadir `http://localhost:8000` a tus URLs de redirección en Supabase para que el login con Google funcione localmente.
 
 ## Despliegue
 
@@ -79,3 +79,67 @@ Consulta la guía de publicación para más detalles:
 -   **Base de Datos y RLS**: [`docs/README_DB.md`](./docs/README_DB.md)
 -   **Almacenamiento**: [`docs/README_STORAGE.md`](./docs/README_STORAGE.md)
 -   **Resolución de Problemas**: [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md)
+
+## Database Schema
+
+The application uses a Supabase backend. The database schema is defined in `supabase/migrations/0001_init.sql`. Here is a breakdown of the tables and their fields:
+
+### `profiles`
+
+This table stores public user data, including their role.
+
+- `id` (uuid, primary key): References `auth.users(id)`.
+- `email` (text, unique): The user's email address.
+- `role` (text, default: 'viewer'): The user's role, which can be `viewer`, `editor`, or `admin`.
+- `created_at` (timestamptz): The timestamp of when the profile was created.
+- `updated_at` (timestamptz): The timestamp of the last profile update.
+
+### `guides`
+
+This table contains the main information for each guide.
+
+- `id` (uuid, primary key): A unique identifier for the guide.
+- `slug` (text, unique): A user-friendly URL slug for the guide.
+- `title` (text): The title of the guide.
+- `summary` (text): A short summary of the guide.
+- `language` (text): The language of the guide.
+- `cover_url` (text): A URL for the guide's cover image.
+- `status` (text, default: 'draft'): The status of the guide, which can be `draft` or `published`.
+- `author_id` (uuid): References the `id` of the author in the `auth.users` table.
+- `created_at` (timestamptz): The timestamp of when the guide was created.
+- `updated_at` (timestamptz): The timestamp of the last guide update.
+
+### `guide_sections`
+
+This table stores the content sections of a guide in order.
+
+- `id` (uuid, primary key): A unique identifier for the section.
+- `guide_id` (uuid): References the `id` of the guide this section belongs to.
+- `order` (integer, default: 0): The order in which the section appears in the guide.
+- `title` (text): The title of the section.
+- `body_md` (text): The content of the section in Markdown format.
+
+### `tags`
+
+This table defines the tags that can be associated with guides.
+
+- `id` (uuid, primary key): A unique identifier for the tag.
+- `name` (text, unique): The name of the tag.
+- `slug` (text, unique): A user-friendly URL slug for the tag.
+
+### `guide_tags`
+
+This is a join table for the many-to-many relationship between guides and tags.
+
+- `guide_id` (uuid): References the `id` of the guide.
+- `tag_id` (uuid): References the `id` of the tag.
+
+### `media`
+
+This table stores references to media files associated with a guide.
+
+- `id` (uuid, primary key): A unique identifier for the media file.
+- `guide_id` (uuid): References the `id` of the guide this media file belongs to.
+- `url` (text): The URL of the media file.
+- `alt` (text): Alternative text for the media file (for accessibility).
+- `kind` (text): The type of media, e.g., 'image', 'video'.

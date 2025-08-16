@@ -1,738 +1,384 @@
-/* Author: Alberto Arce, Arcasoft */
-document.addEventListener('DOMContentLoaded', () => {
-    // --- Service Worker Registration ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').then(registration => {
-                console.log('SW registered: ', registration);
-            }).catch(registrationError => {
-                console.log('SW registration failed: ', registrationError);
-            });
-        });
+// app.js
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// -----------------------------------------------------------------------------
+// Configuración de Supabase
+// -----------------------------------------------------------------------------
+const SUPABASE_URL = 'https://whfcesalellvnrbdcsbb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndoZmNlc2FsZWxsdm5yYmRjc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNTY0NDMsImV4cCI6MjA3MDkzMjQ0M30.wjzU9y1pudSctnLxaIIAfG8FKbMalLbKU4rto99vP9E';
+
+if (SUPABASE_URL.includes('ID-DE-PROYECTO') || SUPABASE_ANON_KEY.includes('TU-CLAVE')) {
+    alert('Error: Debes configurar las variables SUPABASE_URL y SUPABASE_ANON_KEY en app.js');
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// -----------------------------------------------------------------------------
+// Selectores del DOM
+// -----------------------------------------------------------------------------
+const authContainer = document.getElementById('auth-container');
+const userInfo = document.getElementById('user-info');
+const userEmail = document.getElementById('user-email');
+const userRole = document.getElementById('user-role');
+const editorControls = document.getElementById('editor-controls');
+const newGuideBtn = document.getElementById('new-guide-btn');
+const guidesContainer = document.getElementById('guides-container');
+const guidesList = document.getElementById('guides-list');
+const guideDetailContainer = document.getElementById('guide-detail-container');
+const guideFormContainer = document.getElementById('guide-form-container');
+const guideForm = document.getElementById('guide-form');
+const formTitle = document.getElementById('form-title');
+const filtersContainer = document.getElementById('filters-container');
+const paginationContainer = document.getElementById('pagination-container');
+const loadMoreBtn = document.getElementById('load-more-btn');
+const cancelEditBtn = document.getElementById('cancel-edit-btn');
+const addSectionBtn = document.getElementById('add-section-btn');
+const sectionsList = document.getElementById('sections-list');
+const coverPreview = document.getElementById('cover-preview');
+const guideCoverInput = document.getElementById('guide-cover-input');
+
+// -----------------------------------------------------------------------------
+// Estado de la Aplicación
+// -----------------------------------------------------------------------------
+let currentUser = null;
+let userProfile = null;
+let currentPage = 0;
+const GUIDES_PER_PAGE = 6;
+let currentFilters = { language: 'all', tag: 'all' };
+let totalGuides = 0;
+
+// -----------------------------------------------------------------------------
+// Funciones de Autenticación
+// -----------------------------------------------------------------------------
+async function loginWithGoogleRedirect() {
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + window.location.pathname },
+    });
+    if (error) console.error('Error al iniciar sesión con Google:', error.message);
+}
+
+async function logout() {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+        console.error('Error al cerrar sesión:', error.message);
+    } else {
+        window.location.href = window.location.pathname;
+    }
+}
+
+async function getProfile(userId) {
+    const { data, error } = await supabase.from('profiles').select('role').eq('id', userId).single();
+    if (error) {
+        console.error('Error al obtener el perfil:', error);
+        return null;
+    }
+    return data;
+}
+
+// -----------------------------------------------------------------------------
+// Funciones de Renderizado de UI
+// -----------------------------------------------------------------------------
+function renderUI() {
+    const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+
+    if (currentUser && userProfile) {
+        authContainer.innerHTML = '<button id="logout-btn">Cerrar Sesión</button>';
+        document.getElementById('logout-btn').addEventListener('click', logout);
+        userInfo.classList.remove('hidden');
+        userEmail.textContent = currentUser.email;
+        userRole.textContent = userProfile.role;
+        editorControls.classList.toggle('hidden', !isEditor);
+    } else {
+        authContainer.innerHTML = '<button id="login-btn">Continuar con Google</button>';
+        document.getElementById('login-btn').addEventListener('click', loginWithGoogleRedirect);
+        userInfo.classList.add('hidden');
+        editorControls.classList.add('hidden');
+    }
+}
+
+function renderGuidesList(guides, append = false) {
+    if (!append) guidesList.innerHTML = '';
+    if (!guides || guides.length === 0) {
+        if (!append) guidesList.innerHTML = '<p>No hay guías que coincidan con los filtros.</p>';
+        paginationContainer.classList.add('hidden');
+        return;
+    }
+    guidesList.innerHTML += guides.map(guide => `
+        <div class="guide-card" data-slug="${guide.slug}">
+            <img src="${guide.cover_url || 'https://via.placeholder.com/300x180.png?text=Guía'}" alt="Portada de ${guide.title}">
+            <div class="guide-card-content">
+                <h3>${guide.title}</h3>
+                <p>${guide.summary || ''}</p>
+                <small>Idioma: ${guide.language}</small>
+            </div>
+        </div>
+    `).join('');
+    const currentlyDisplayed = guidesList.children.length;
+    paginationContainer.classList.toggle('hidden', currentlyDisplayed >= totalGuides);
+}
+
+function renderGuideDetail(guide, sections) {
+    guidesContainer.classList.add('hidden');
+    guideDetailContainer.classList.remove('hidden');
+    const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+
+    guideDetailContainer.innerHTML = `
+        <button id="back-to-list-btn">&larr; Volver a la lista</button>
+        ${isEditor ? `<button id="edit-guide-btn" data-guide-id="${guide.id}">Editar Guía</button>` : ''}
+        <h2>${guide.title}</h2>
+        <p><em>${guide.summary}</em></p>
+        ${guide.cover_url ? `<img src="${guide.cover_url}" alt="Portada de ${guide.title}" class="cover-image">` : ''}
+        <hr>
+        ${sections.map(section => `
+            <div class="guide-section">
+                <h3>${section.title}</h3>
+                <p>${section.body_md ? section.body_md.replace(/\n/g, '<br>') : ''}</p>
+            </div>
+        `).join('')}
+    `;
+
+    document.getElementById('back-to-list-btn').addEventListener('click', showListView);
+    if (isEditor) {
+        document.getElementById('edit-guide-btn').addEventListener('click', () => fetchGuideBySlug(guide.slug, true));
+    }
+}
+
+async function renderFilters() {
+    const { data: languages, error: langError } = await supabase.from('guides').select('language').eq('status', 'published');
+    const { data: tags, error: tagError } = await supabase.from('tags').select('name, slug');
+    if (langError || tagError) {
+        console.error("Error fetching filters data", { langError, tagError });
+        return;
+    }
+    const uniqueLanguages = [...new Set(languages.map(l => l.language))];
+    filtersContainer.innerHTML = `
+        <select id="lang-filter"><option value="all">Idiomas</option>${uniqueLanguages.map(lang => `<option value="${lang}">${lang}</option>`).join('')}</select>
+        <select id="tag-filter"><option value="all">Etiquetas</option>${tags.map(tag => `<option value="${tag.slug}">${tag.name}</option>`).join('')}</select>
+    `;
+    document.getElementById('lang-filter').addEventListener('change', (e) => { currentFilters.language = e.target.value; resetAndFetchGuides(); });
+    document.getElementById('tag-filter').addEventListener('change', (e) => { currentFilters.tag = e.target.value; resetAndFetchGuides(); });
+}
+
+function renderGuideForm(guide = {}, sections = []) {
+    guidesContainer.classList.add('hidden');
+    guideDetailContainer.classList.add('hidden');
+    guideFormContainer.classList.remove('hidden');
+
+    formTitle.textContent = guide.id ? 'Editar Guía' : 'Crear Nueva Guía';
+    guideForm.reset();
+    document.getElementById('guide-id').value = guide.id || '';
+    document.getElementById('guide-title-input').value = guide.title || '';
+    document.getElementById('guide-slug-input').value = guide.slug || '';
+    document.getElementById('guide-summary-input').value = guide.summary || '';
+    document.getElementById('guide-language-input').value = guide.language || 'es';
+    document.getElementById('guide-status-select').value = guide.status || 'draft';
+
+    if (guide.cover_url) {
+        coverPreview.src = guide.cover_url;
+        coverPreview.classList.remove('hidden');
+    } else {
+        coverPreview.classList.add('hidden');
     }
 
-    // --- Elements ---
-    const langSelector = document.getElementById('language-selector');
-    const playBtn = document.getElementById('play-btn');
-    const pauseBtn = document.getElementById('pause-btn');
-    const stopBtn = document.getElementById('stop-btn');
-    const guideText = document.getElementById('guide-text-overlay').querySelector('p');
-    const simulationModeToggle = document.getElementById('simulation-mode-toggle');
-    const themeToggle = document.getElementById('theme-toggle');
-    const sidePanel = document.getElementById('side-panel');
-    const panelToggleBtn = document.getElementById('panel-toggle-btn');
-    const poiList = document.getElementById('poi-list');
-    const aboutBtn = document.getElementById('about-btn');
-    const aboutModal = document.getElementById('about-modal');
-    const modalCloseBtn = aboutModal.querySelector('.modal-close-btn');
-    const welcomeModal = document.getElementById('welcome-modal');
-    const guideMetaContainer = document.getElementById('guide-meta-container');
-    const authorNameSpan = document.getElementById('author-name');
-    const donationLink = document.getElementById('donation-link');
-    const guideCatalogList = document.getElementById('guide-catalog-list');
-    const createNewGuideBtn = document.getElementById('create-new-guide-btn');
+    sectionsList.innerHTML = '';
+    sections.forEach(s => renderSectionInput(s));
+}
 
-    // --- State and Config ---
-    const synth = window.speechSynthesis;
-    let utterance = new SpeechSynthesisUtterance();
-    let lastTriggeredPoiId = null;
-    const PROXIMITY_THRESHOLD = 20; // meters
-    let currentLang = 'en';
-    let isSimulationMode = simulationModeToggle.checked;
-    let isEditMode = false; // Default to view mode
-    let isAddingPoi = false;
-    let map;
-    let userMarker;
-    let geolocationId = null;
-    let typewriterInterval = null;
-    const poiMarkers = {};
-    let pois = [];
-    let poiBaseData = [];
-    let availableLanguages = {};
-    let tourRoute = [];
-    let routePolylines = [];
-    let visitedPois = new Set();
-    let breadcrumbPath = [];
-    let breadcrumbLayer = null;
+function renderSectionInput(section = {}) {
+    const div = document.createElement('div');
+    div.className = 'section-item';
+    div.innerHTML = `
+        <input type="hidden" class="section-id" value="${section.id || ''}">
+        <label>Título de la sección:</label>
+        <input type="text" class="section-title" value="${section.title || ''}">
+        <label>Contenido (Markdown):</label>
+        <textarea class="section-body" rows="5">${section.body_md || ''}</textarea>
+        <button type="button" class="remove-section-btn">Eliminar Sección</button>
+    `;
+    sectionsList.appendChild(div);
+    div.querySelector('.remove-section-btn').addEventListener('click', () => div.remove());
+}
 
-    const introPhrases = {
-        en: ["You have arrived at", "You are now at", "This is"],
-        es: ["Has llegado a", "Te encuentras en", "Esto es"],
-        fr: ["Vous êtes arrivé à", "Vous êtes maintenant à", "Voici"],
-        de: ["Sie sind angekommen bei", "Sie befinden sich jetzt bei", "Das ist"],
-        zh: ["您已到达", "您现在在", "这里是"]
+// -----------------------------------------------------------------------------
+// Funciones de Carga y Guardado de Datos (CRUD)
+// -----------------------------------------------------------------------------
+async function fetchGuides(append = false) {
+    let query = supabase.from('guides').select('*, guide_tags!inner(tags!inner(slug))', { count: 'exact' }).eq('status', 'published');
+    if (currentFilters.language !== 'all') query = query.eq('language', currentFilters.language);
+    if (currentFilters.tag !== 'all') query = query.eq('guide_tags.tags.slug', currentFilters.tag);
+
+    const start = currentPage * GUIDES_PER_PAGE;
+    const { data, error, count } = await query.range(start, start + GUIDES_PER_PAGE - 1).order('updated_at', { ascending: false });
+
+    if (error) { console.error('Error al cargar las guías:', error); guidesList.innerHTML = '<p>Error al cargar las guías.</p>'; return; }
+    totalGuides = count;
+    renderGuidesList(data, append);
+}
+
+function resetAndFetchGuides() {
+    currentPage = 0;
+    guidesList.innerHTML = '<p>Cargando guías...</p>';
+    fetchGuides(false);
+}
+
+async function fetchGuideBySlug(slug, forEdit = false) {
+    const { data: guideData, error: guideError } = await supabase.from('guides').select('*').eq('slug', slug).single();
+    if (guideError) { alert('Error al cargar la guía.'); console.error(guideError); return; }
+    if (!guideData) { alert('Guía no encontrada.'); return; }
+
+    const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+    if (!forEdit && guideData.status !== 'published' && !isEditor) { alert('No tienes permiso para ver esta guía.'); showListView(); return; }
+
+    const { data: sectionsData, error: sectionsError } = await supabase.from('guide_sections').select('*').eq('guide_id', guideData.id).order('order');
+    if (sectionsError) { alert('Error al cargar las secciones.'); console.error(sectionsError); return; }
+
+    if (forEdit && isEditor) {
+        renderGuideForm(guideData, sectionsData);
+    } else {
+        renderGuideDetail(guideData, sectionsData);
+    }
+}
+
+async function uploadGuideCover(file, guideId) {
+    if (!file) return null;
+    const fileName = `${guideId}/${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from('guides').upload(fileName, file);
+    if (error) {
+        console.error('Error subiendo imagen:', error);
+        return null;
+    }
+    const { data } = supabase.storage.from('guides').getPublicUrl(fileName);
+    return data.publicUrl;
+}
+
+async function saveGuide(event) {
+    event.preventDefault();
+    const guideId = document.getElementById('guide-id').value;
+    const coverFile = guideCoverInput.files[0];
+
+    // --- 0. Subir imagen si existe ---
+    let coverUrl = document.getElementById('cover-preview').src;
+    if (coverFile) {
+        // Si es una guía nueva, necesitamos un ID para la ruta. Usaremos un uuid temporal.
+        const tempId = guideId || crypto.randomUUID();
+        const newUrl = await uploadGuideCover(coverFile, tempId);
+        if (newUrl) {
+            coverUrl = newUrl;
+        } else {
+            alert("Error al subir la imagen de portada. La guía se guardará sin ella.");
+        }
+    }
+
+    const guideData = {
+        title: document.getElementById('guide-title-input').value,
+        slug: document.getElementById('guide-slug-input').value,
+        summary: document.getElementById('guide-summary-input').value,
+        language: document.getElementById('guide-language-input').value,
+        status: document.getElementById('guide-status-select').value,
+        author_id: currentUser.id,
+        cover_url: coverUrl.startsWith('blob:') ? null : coverUrl, // No guardar URLs de blob
     };
 
-    // --- Functions ---
-
-    function toggleAddPoiMode() {
-        isAddingPoi = !isAddingPoi;
-        const mapContainer = document.getElementById('map-container');
-        if (isAddingPoi) {
-            mapContainer.style.cursor = 'crosshair';
-            // Assumes an 'add-poi-btn' exists, which we will add to index.html
-            document.getElementById('add-poi-btn').textContent = 'Cancel Adding POI';
-        } else {
-            mapContainer.style.cursor = '';
-            document.getElementById('add-poi-btn').textContent = 'Add New POI';
-        }
+    // --- 1. Guardar la guía principal (Insert o Update) ---
+    let savedGuide;
+    if (guideId) {
+        const { data, error } = await supabase.from('guides').update(guideData).eq('id', guideId).select().single();
+        if (error) { alert(`Error al actualizar la guía: ${error.message}`); return; }
+        savedGuide = data;
+    } else {
+        const { data, error } = await supabase.from('guides').insert(guideData).select().single();
+        if (error) { alert(`Error al crear la guía: ${error.message}`); return; }
+        savedGuide = data;
     }
 
-    function editPoi(poiId) {
-        const poi = pois.find(p => p.id === poiId);
-        if (!poi || !poi.texts[currentLang]) return;
-
-        const currentText = poi.texts[currentLang];
-        const newName = prompt(`Enter new name for ${availableLanguages[currentLang]}:`, currentText.name);
-        if (newName) {
-            poi.texts[currentLang].name = newName;
-            poi.name = newName; // Update the top-level property for current view
-        }
-
-        const newDescription = prompt(`Enter new description for ${availableLanguages[currentLang]}:`, currentText.description);
-        if (newDescription) {
-            poi.texts[currentLang].description = newDescription;
-            poi.description = newDescription; // Update the top-level property for current view
-        }
-
-        renderPoiList();
-        renderPois();
-    }
-
-    function deletePoi(poiId) {
-        if (!confirm("Are you sure you want to delete this POI?")) return;
-        pois = pois.filter(p => p.id !== poiId);
-        poiBaseData = poiBaseData.filter(p => p.id !== poiId);
-        tourRoute = tourRoute.filter(id => id !== poiId);
-        renderPois();
-        renderPoiList();
-        drawTourRoute();
-    }
-
-    function onMapClick(e) {
-        if (!isAddingPoi) return;
-        const { lat, lng } = e.latlng;
-        const poiName = prompt(`Enter name for new POI (${availableLanguages[currentLang]}):`);
-        if (!poiName) {
-            toggleAddPoiMode();
-            return;
-        }
-        const poiDescription = prompt(`Enter description for new POI (${availableLanguages[currentLang]}):`);
-        if (!poiDescription) {
-            toggleAddPoiMode();
-            return;
-        }
-
-        const newPoiId = `poi-${Date.now()}`;
-        const newPoiBase = { id: newPoiId, lat: lat, lon: lng };
-
-        const newPoiTexts = {};
-        // Initialize all available languages
-        for (const langCode in availableLanguages) {
-            if (langCode === currentLang) {
-                newPoiTexts[langCode] = { name: poiName, description: poiDescription };
-            } else {
-                newPoiTexts[langCode] = { name: `${poiName} [NEEDS TRANSLATION]`, description: "[NEEDS TRANSLATION]" };
-            }
-        }
-
-        const newPoi = { ...newPoiBase, texts: newPoiTexts, name: poiName, description: poiDescription };
-
-        poiBaseData.push(newPoiBase);
-        pois.push(newPoi);
-        tourRoute.push(newPoiId);
-
-        renderPois();
-        renderPoiList();
-        drawTourRoute();
-        toggleAddPoiMode();
-    }
-
-    async function saveGuide() {
-        const guideName = prompt("Enter a name for your guide:", "My Awesome Guide");
-        if (!guideName) return;
-        const guideDescription = prompt("Enter a short description:", "An interactive voice guide.");
-        const authorName = prompt("Enter your name or nickname (optional):");
-        const donationLink = prompt("Enter your Patreon or BuyMeACoffee link (optional):");
-
-        const guideData = {
-            guideName: guideName,
-            guideDescription: guideDescription,
-            author: authorName || "Anonymous",
-            donationLink: donationLink || "",
-            initialView: { lat: map.getCenter().lat, lon: map.getCenter().lng, zoom: map.getZoom() },
-            availableLanguages: availableLanguages,
-            poiBaseData: poiBaseData,
-            pois: pois.map(p => ({ id: p.id, texts: p.texts })),
-            tourRoute: tourRoute
+    // --- 2. Guardar las secciones ---
+    const sectionNodes = sectionsList.querySelectorAll('.section-item');
+    const sectionPromises = Array.from(sectionNodes).map((node, index) => {
+        const section = {
+            guide_id: savedGuide.id,
+            title: node.querySelector('.section-title').value,
+            body_md: node.querySelector('.section-body').value,
+            order: index,
         };
-
-        alert("Saving guide via our secure service...");
-
-        try {
-            const response = await fetch('/api/create-gist', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ guideData: guideData })
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || 'Failed to save guide.');
-            }
-
-            prompt("Success! Your guide is saved. Copy this URL:", result.html_url);
-
-        } catch (error) {
-            console.error("Save guide error:", error);
-            prompt(`Error saving guide: ${error.message}\n\nPlease copy the data below and save it manually.`, JSON.stringify(guideData, null, 2));
-        }
-    }
-
-
-    function typewriterEffect(element, text, speed = 30) {
-        if (typewriterInterval) clearInterval(typewriterInterval);
-        let i = 0;
-        element.textContent = "";
-        typewriterInterval = setInterval(() => {
-            if (i < text.length) {
-                element.textContent += text.charAt(i);
-                i++;
-            } else {
-                clearInterval(typewriterInterval);
-                typewriterInterval = null;
-            }
-        }, speed);
-    }
-
-    function updateGuideText(text, useTypewriter = false) {
-        if (useTypewriter) {
-            typewriterEffect(guideText, text);
+        const sectionId = node.querySelector('.section-id').value;
+        if (sectionId) {
+            return supabase.from('guide_sections').update(section).eq('id', sectionId);
         } else {
-            if (typewriterInterval) clearInterval(typewriterInterval);
-            guideText.textContent = text;
-        }
-        if (guideText.parentElement.scrollHeight > guideText.parentElement.clientHeight) {
-            guideText.parentElement.scrollTop = 0;
-        }
-    }
-
-    function populateLanguageSelector() {
-        langSelector.innerHTML = '';
-        for (const [code, name] of Object.entries(availableLanguages)) {
-            const option = document.createElement('option');
-            option.value = code;
-            option.textContent = name;
-            if (code === currentLang) option.selected = true;
-            langSelector.appendChild(option);
-        }
-        langSelector.addEventListener('change', (e) => switchLanguage(e.target.value));
-    }
-
-    function switchLanguage(langCode) {
-        currentLang = langCode;
-        // Update the name/description on each POI from the nested texts object
-        pois.forEach(poi => {
-            if (poi.texts && poi.texts[langCode]) {
-                poi.name = poi.texts[langCode].name;
-                poi.description = poi.texts[langCode].description;
-            } else {
-                // Fallback to english or first available language if current is missing
-                const fallbackLang = Object.keys(poi.texts)[0];
-                poi.name = poi.texts[fallbackLang].name;
-                poi.description = poi.texts[fallbackLang].description;
-            }
-        });
-
-        // Update voice synthesis language
-        const langMap = { en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN' };
-        utterance.lang = langMap[langCode] || 'en-US';
-
-        renderPois();
-        renderPoiList();
-    }
-
-    function renderPoiList() {
-        poiList.innerHTML = '';
-        tourRoute.forEach(poiId => {
-            const poi = pois.find(p => p.id === poiId);
-            if (poi) {
-                const li = document.createElement('li');
-                li.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
-
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = poi.name;
-                nameSpan.dataset.poiId = poi.id;
-                li.appendChild(nameSpan);
-
-                if (isEditMode) {
-                    const btnGroup = document.createElement('div');
-
-                    const editBtn = document.createElement('button');
-                    editBtn.className = 'btn-modern btn-modern-secondary btn-modern-sm me-2';
-                    editBtn.textContent = 'Edit';
-                    editBtn.onclick = () => editPoi(poi.id);
-
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'btn-modern btn-modern-danger btn-modern-sm';
-                    deleteBtn.textContent = 'Del';
-                    deleteBtn.onclick = () => deletePoi(poi.id);
-
-                    btnGroup.appendChild(editBtn);
-                    btnGroup.appendChild(deleteBtn);
-                    li.appendChild(btnGroup);
-                }
-
-                if (visitedPois.has(poiId)) {
-                    li.classList.add('visited');
-                }
-                poiList.appendChild(li);
-            }
-        });
-    }
-
-    function drawTourRoute() {
-        routePolylines.forEach(line => line.remove());
-        routePolylines = [];
-        for (let i = 0; i < tourRoute.length - 1; i++) {
-            const startPoi = pois.find(p => p.id === tourRoute[i]);
-            const endPoi = pois.find(p => p.id === tourRoute[i + 1]);
-            if (startPoi && endPoi) {
-                const isVisited = visitedPois.has(endPoi.id);
-                const color = isVisited ? '#28a745' : '#3388ff';
-                const line = L.polyline([[startPoi.lat, startPoi.lon], [endPoi.lat, endPoi.lon]], {
-                    color: color,
-                    weight: 3,
-                    opacity: 0.7
-                }).addTo(map);
-                routePolylines.push(line);
-            }
-        }
-    }
-
-    function drawBreadcrumbs() {
-        if (breadcrumbLayer) {
-            breadcrumbLayer.remove();
-        }
-        const breadcrumbMarkers = breadcrumbPath.map(pos =>
-            L.circleMarker(pos, {
-                radius: 2,
-                color: '#ff0000',
-                fillColor: '#ff0000',
-                fillOpacity: 0.8
-            })
-        );
-        breadcrumbLayer = L.layerGroup(breadcrumbMarkers).addTo(map);
-    }
-
-    function renderPois() {
-        for (const markerId in poiMarkers) {
-            poiMarkers[markerId].remove();
-            delete poiMarkers[markerId];
-        }
-        pois.forEach(poi => {
-            const marker = L.marker([poi.lat, poi.lon], {
-                draggable: isEditMode
-            }).addTo(map).bindPopup(poi.name);
-
-            marker.on('click', () => {
-                if (isSimulationMode && !isEditMode) simulateVisitToPoi(poi.id);
-            });
-
-            marker.on('dragend', (event) => {
-                const marker = event.target;
-                const position = marker.getLatLng();
-                const poiId = poi.id;
-
-                const basePoi = poiBaseData.find(p => p.id === poiId);
-                if (basePoi) {
-                    basePoi.lat = position.lat;
-                    basePoi.lon = position.lng;
-                }
-
-                const mergedPoi = pois.find(p => p.id === poiId);
-                if (mergedPoi) {
-                    mergedPoi.lat = position.lat;
-                    mergedPoi.lon = position.lng;
-                }
-
-                drawTourRoute();
-            });
-
-            poiMarkers[poi.id] = marker;
-        });
-    }
-
-    function simulateVisitToPoi(poiId) {
-        const poi = pois.find(p => p.id === poiId);
-        if (!poi) return;
-        const { lat, lon } = poi;
-        if (!userMarker) createUserMarker(lat, lon);
-        else userMarker.setLatLng([lat, lon]);
-        map.flyTo([lat, lon], 18);
-        checkProximity(lat, lon);
-    }
-
-    function speak(text) {
-        if (synth.speaking) synth.cancel();
-        utterance.text = text;
-        synth.speak(utterance);
-    }
-
-    function startGpsTracking() {
-        if (geolocationId) navigator.geolocation.clearWatch(geolocationId);
-        if (navigator.geolocation) {
-            geolocationId = navigator.geolocation.watchPosition(showPosition, showError, { enableHighAccuracy: true });
-        } else {
-            updateGuideText("Geolocation is not supported by this browser.");
-        }
-    }
-
-    function stopGpsTracking() {
-        if (geolocationId) {
-            navigator.geolocation.clearWatch(geolocationId);
-            geolocationId = null;
-        }
-    }
-
-    function getLocation() {
-        if (!isSimulationMode) startGpsTracking();
-    }
-
-    function createUserMarker(lat, lon) {
-        const userIcon = L.divIcon({
-            html: '<div style="background-color: blue; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
-            className: '',
-            iconSize: [15, 15],
-            iconAnchor: [9, 9]
-        });
-        userMarker = L.marker([lat, lon], { icon: userIcon }).addTo(map);
-        if (isSimulationMode) userMarker.setOpacity(0.5);
-    }
-
-    function showPosition(position) {
-        const { latitude: lat, longitude: lon } = position.coords;
-        if (!userMarker) createUserMarker(lat, lon);
-        else userMarker.setLatLng([lat, lon]);
-
-        const lastBreadcrumb = breadcrumbPath[breadcrumbPath.length - 1];
-        if (!lastBreadcrumb || getDistance(lat, lon, lastBreadcrumb[0], lastBreadcrumb[1]) > 10) { // Add breadcrumb every 10 meters
-            breadcrumbPath.push([lat, lon]);
-            drawBreadcrumbs();
-        }
-
-        if (!synth.speaking) {
-            updateGuideText(`Your position: Latitude: ${lat.toFixed(4)}, Longitude: ${lon.toFixed(4)}`);
-        }
-        checkProximity(lat, lon);
-    }
-
-    function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3;
-        const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
-        const Δφ = (lat2-lat1) * Math.PI/180; const Δλ = (lon2-lon1) * Math.PI/180;
-        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    }
-
-    function checkProximity(lat, lon) {
-        if (!pois || pois.length === 0) return;
-
-        let closestPoi = pois.reduce((closest, poi) => {
-            const distance = getDistance(lat, lon, poi.lat, poi.lon);
-            if (distance < closest.distance) return { ...poi, distance };
-            return closest;
-        }, { distance: Infinity });
-
-        const inRangeOfPoi = closestPoi.distance < PROXIMITY_THRESHOLD ? closestPoi : null;
-        const newTriggerId = inRangeOfPoi ? inRangeOfPoi.id : null;
-
-        if (lastTriggeredPoiId && lastTriggeredPoiId !== newTriggerId) {
-            poiMarkers[lastTriggeredPoiId].closePopup();
-        }
-        if (newTriggerId && newTriggerId !== lastTriggeredPoiId) {
-            poiMarkers[newTriggerId].openPopup();
-            lastTriggeredPoiId = newTriggerId;
-
-            visitedPois.add(newTriggerId);
-            drawTourRoute();
-            renderPoiList();
-
-            const intros = introPhrases[currentLang] || introPhrases.en;
-            const randomIntro = intros[Math.floor(Math.random() * intros.length)];
-            const fullDescription = `${randomIntro} ${inRangeOfPoi.name}. ${inRangeOfPoi.description}`;
-
-            updateGuideText(fullDescription, true);
-            speak(fullDescription);
-        } else if (!newTriggerId && lastTriggeredPoiId) {
-            lastTriggeredPoiId = null;
-        }
-    }
-
-    function setupEventListeners() {
-        simulationModeToggle.addEventListener('change', handleModeChange);
-        themeToggle.addEventListener('change', () => applyTheme(themeToggle.checked ? 'light' : 'dark'));
-        panelToggleBtn.addEventListener('click', () => {
-            sidePanel.classList.toggle('collapsed');
-            panelToggleBtn.textContent = sidePanel.classList.contains('collapsed') ? '☰' : '←';
-        });
-        poiList.addEventListener('click', (event) => {
-            if (isSimulationMode && event.target.matches('span[data-poi-id]')) {
-                simulateVisitToPoi(event.target.dataset.poiId);
-            }
-        });
-        playBtn.addEventListener('click', () => {
-            if (synth.paused) synth.resume();
-            else if (lastTriggeredPoiId) {
-                const poi = pois.find(p => p.id === lastTriggeredPoiId);
-                if (poi) speak(poi.description);
-            }
-        });
-        pauseBtn.addEventListener('click', () => { if (synth.speaking) synth.pause(); });
-        stopBtn.addEventListener('click', () => {
-            if (synth.speaking) synth.cancel();
-            if (lastTriggeredPoiId) {
-                poiMarkers[lastTriggeredPoiId].closePopup();
-                lastTriggeredPoiId = null;
-            }
-        });
-        aboutBtn.addEventListener('click', () => aboutModal.classList.remove('hidden'));
-        modalCloseBtn.addEventListener('click', () => aboutModal.classList.add('hidden'));
-    }
-
-    function showError(error) {
-        const errorMessages = {
-            [error.PERMISSION_DENIED]: "User denied the request for Geolocation.",
-            [error.POSITION_UNAVAILABLE]: "Location information is unavailable.",
-            [error.TIMEOUT]: "The request to get user location timed out."
-        };
-        updateGuideText(errorMessages[error.code] || "An unknown error occurred.");
-    }
-
-    // --- Event Listeners and Init ---
-
-    function handleModeChange() {
-        isSimulationMode = simulationModeToggle.checked;
-        if (isSimulationMode) {
-            stopGpsTracking();
-            if (userMarker) userMarker.setOpacity(0.5);
-            // Clear breadcrumbs when entering simulation mode
-            breadcrumbPath = [];
-            if (breadcrumbLayer) breadcrumbLayer.remove();
-        } else {
-            if (userMarker) userMarker.setOpacity(1.0);
-            startGpsTracking();
-        }
-    }
-
-    function applyTheme(theme) {
-        document.body.dataset.theme = theme;
-        localStorage.setItem('alhambra-theme', theme);
-        themeToggle.checked = theme === 'light';
-    }
-
-    function downloadJson(data, filename) {
-        const jsonStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    playBtn.addEventListener('click', () => {
-        if (synth.paused) synth.resume();
-        else if (lastTriggeredPoiId) {
-            const poi = pois.find(p => p.id === lastTriggeredPoiId);
-            if (poi) speak(poi.description);
-        }
-    });
-    pauseBtn.addEventListener('click', () => { if (synth.speaking) synth.pause(); });
-    stopBtn.addEventListener('click', () => {
-        if (synth.speaking) synth.cancel();
-        if (lastTriggeredPoiId) {
-            poiMarkers[lastTriggeredPoiId].closePopup();
-            lastTriggeredPoiId = null;
+            return supabase.from('guide_sections').insert(section);
         }
     });
 
-    function setMode(mode) {
-        isEditMode = mode === 'edit';
-        const modeControls = document.getElementById('mode-controls');
-        modeControls.innerHTML = ''; // Clear existing controls
+    await Promise.all(sectionPromises);
+    alert('Guía guardada con éxito!');
+    showListView(true);
+}
 
-        if (isEditMode) {
-            const saveBtn = document.createElement('button');
-            saveBtn.id = 'save-guide-btn';
-            saveBtn.className = 'btn-modern btn-modern-primary';
-            saveBtn.textContent = 'Save Guide';
-            saveBtn.onclick = saveGuide;
-            modeControls.appendChild(saveBtn);
+// -----------------------------------------------------------------------------
+// Lógica de "Enrutamiento" y Vistas
+// -----------------------------------------------------------------------------
+function showListView(forceReload = false) {
+    guideDetailContainer.classList.add('hidden');
+    guideFormContainer.classList.add('hidden');
+    guidesContainer.classList.remove('hidden');
+    window.history.pushState({}, '', window.location.pathname);
+    if (forceReload) resetAndFetchGuides();
+}
 
-            const addPoiBtn = document.createElement('button');
-            addPoiBtn.id = 'add-poi-btn';
-            addPoiBtn.className = 'btn-modern btn-modern-success';
-            addPoiBtn.textContent = 'Add New POI';
-            addPoiBtn.onclick = toggleAddPoiMode;
-            modeControls.appendChild(addPoiBtn);
-
-            const exitEditBtn = document.createElement('button');
-            exitEditBtn.className = 'btn-modern btn-modern-secondary';
-            exitEditBtn.textContent = 'Exit Edit Mode';
-            exitEditBtn.onclick = () => setMode('view');
-            modeControls.appendChild(exitEditBtn);
-
-        } else {
-            const enterEditBtn = document.createElement('button');
-            enterEditBtn.className = 'btn-modern btn-modern-primary';
-            enterEditBtn.textContent = 'Edit This Guide';
-            enterEditBtn.onclick = () => setMode('edit');
-            modeControls.appendChild(enterEditBtn);
-        }
-
-        // Re-render UI elements that depend on the mode
-        renderPois();
-        renderPoiList();
-    }
-
-    async function init() {
-        try {
-            setupEventListeners(); // Setup general listeners once
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const gistId = urlParams.get('gist');
-
-            if (gistId) {
-                welcomeModal.classList.add('hidden');
-                await initializeMapWithGuide(gistId);
-            } else {
-                await showWelcomeModal();
-            }
-        } catch (error) {
-            console.error("Initialization failed:", error);
-            if (welcomeModal) welcomeModal.classList.add('hidden');
-            updateGuideText("Could not initialize the application. Please try again later.");
+function handleRouting() {
+    const params = new URLSearchParams(window.location.search);
+    const guideSlug = params.get('guide');
+    if (guideSlug) {
+        fetchGuideBySlug(guideSlug);
+    } else {
+        showListView();
+        if (guidesList.innerHTML.trim() === '' || guidesList.innerHTML.includes('Cargando')) {
+            resetAndFetchGuides();
+            renderFilters();
         }
     }
+}
 
-    async function showWelcomeModal() {
-        const response = await fetch('assets/guides.json');
-        const guides = await response.json();
-
-        guideCatalogList.innerHTML = '';
-        guides.forEach(guide => {
-            const card = document.createElement('div');
-            card.className = 'card mb-3';
-
-            const cardBody = document.createElement('div');
-            cardBody.className = 'card-body';
-
-            const title = document.createElement('h5');
-            title.className = 'card-title';
-            title.textContent = guide.name;
-
-            const description = document.createElement('p');
-            description.className = 'card-text';
-            description.textContent = guide.description;
-
-            const link = document.createElement('a');
-            link.href = `?gist=${guide.gistId}`;
-            link.className = 'btn-modern btn-modern-primary';
-            link.textContent = 'Load Guide';
-
-            cardBody.appendChild(title);
-            cardBody.appendChild(description);
-            cardBody.appendChild(link);
-            card.appendChild(cardBody);
-
-            guideCatalogList.appendChild(card);
-        });
-
-        createNewGuideBtn.onclick = async () => {
-            welcomeModal.classList.add('hidden');
-            await initializeMapWithGuide(null, true); // true for blank editor
-        };
-    }
-
-    async function initializeMapWithGuide(gistId, isBlankEditor = false) {
-        map = L.map('map-container');
-        map.on('click', onMapClick); // Add map click listener here
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-
-        if (isBlankEditor) {
-            // New guide, set default view and empty data
-            document.getElementById('guide-title').textContent = "New Guide";
-            guideMetaContainer.classList.add('hidden');
-            map.setView([48.8584, 2.2945], 13); // Default to Paris
-            availableLanguages = { "en": "English", "es": "Español" };
-            pois = [];
-            poiBaseData = [];
-            tourRoute = [];
-        } else {
-            await loadGuideFromGist(gistId);
+function bindEventListeners() {
+    guidesList.addEventListener('click', (e) => {
+        const card = e.target.closest('.guide-card');
+        if (card) {
+            const slug = card.dataset.slug;
+            window.history.pushState({ slug }, ``, `?guide=${slug}`);
+            fetchGuideBySlug(slug);
         }
-
-        populateLanguageSelector();
-        const savedTheme = localStorage.getItem('alhambra-theme') || 'dark';
-        applyTheme(savedTheme);
-
-        // Set initial language and render texts
-        switchLanguage(currentLang);
-
-        // Set up event listeners and modes
-        renderPois();
-        renderPoiList();
-        drawTourRoute();
-        getLocation();
-        updateGuideText("Welcome! Select a POI from the list or use your GPS in live mode.");
-        setMode(isBlankEditor ? 'edit' : 'view');
-    }
-
-    async function loadGuideFromGist(gistId) {
-        const response = await fetch(`https://api.github.com/gists/${gistId}`);
-        if (!response.ok) throw new Error('Could not load guide from Gist.');
-        const gistData = await response.json();
-        const file = gistData.files['guide.json'];
-        if (!file) throw new Error('Gist does not contain a guide.json file.');
-        const guideData = JSON.parse(file.content);
-
-        // Update UI with guide metadata
-        document.getElementById('guide-title').textContent = guideData.guideName || 'Interactive Guide';
-        if (guideData.author) {
-            authorNameSpan.textContent = guideData.author;
-            guideMetaContainer.classList.remove('hidden');
+    });
+    window.addEventListener('popstate', handleRouting);
+    loadMoreBtn.addEventListener('click', () => { currentPage++; fetchGuides(true); });
+    newGuideBtn.addEventListener('click', () => renderGuideForm());
+    cancelEditBtn.addEventListener('click', () => showListView());
+    addSectionBtn.addEventListener('click', () => renderSectionInput());
+    guideForm.addEventListener('submit', saveGuide);
+    guideCoverInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            coverPreview.src = URL.createObjectURL(file);
+            coverPreview.classList.remove('hidden');
         }
-        if (guideData.donationLink) {
-            donationLink.href = guideData.donationLink;
-            donationLink.classList.remove('hidden');
-        } else {
-            donationLink.classList.add('hidden');
-        }
+    });
+}
 
+// -----------------------------------------------------------------------------
+// Inicialización
+// -----------------------------------------------------------------------------
+async function init() {
+    bindEventListeners();
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        currentUser = session?.user || null;
+        userProfile = currentUser ? await getProfile(currentUser.id) : null;
+        renderUI();
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') showListView(true);
+    });
+    const { data: { session } } = await supabase.auth.getSession();
+    currentUser = session?.user || null;
+    userProfile = currentUser ? await getProfile(currentUser.id) : null;
+    renderUI();
+    handleRouting();
+}
 
-        poiBaseData = guideData.poiBaseData;
-        tourRoute = guideData.tourRoute;
-        availableLanguages = guideData.availableLanguages;
-
-        // Store all language data in a new structure
-        pois = guideData.pois.map(p => ({
-            ...poiBaseData.find(pb => pb.id === p.id),
-            texts: p.texts
-        }));
-
-        const { lat, lon, zoom } = guideData.initialView;
-        map.setView([lat, lon], zoom);
-    }
-
-    init();
-});
+document.addEventListener('DOMContentLoaded', init);

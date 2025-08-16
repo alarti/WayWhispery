@@ -1,6 +1,6 @@
 {
-  "name": "Alhambra Voice Guide",
-  "short_name": "Alhambra Guide",
+  "name": "WayWhispery",
+  "short_name": "WayWhispery",
   "description": "An offline GPS voice guide for the Alhambra in Granada. Author: Alberto Arce, Arcasoft.",
   "start_url": "index.html",
   "display": "standalone",
