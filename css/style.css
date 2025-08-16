@@ -349,3 +349,13 @@ hr {
 #form-modal-content .btn-modern {
     margin-top: 1rem;
 }
+
+.btn-group {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-group .btn-modern {
+    width: auto; /* Override the 100% width */
+    flex-shrink: 0;
+}

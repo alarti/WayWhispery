@@ -33,7 +33,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const panelToggleBtn = document.getElementById('panel-toggle-btn');
     const welcomeModal = document.getElementById('welcome-modal');
     const aboutModal = document.getElementById('about-modal');
-    const modalCloseBtn = aboutModal.querySelector('.modal-close-btn');
+    const aboutBtn = document.getElementById('about-btn');
+    const aboutModalCloseBtn = aboutModal.querySelector('.modal-close-btn');
 
     // Guide Info
     const guideTitle = document.getElementById('guide-title');
@@ -165,12 +166,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    function setupEventListeners() {
+        aboutBtn.addEventListener('click', () => aboutModal.classList.remove('hidden'));
+        aboutModalCloseBtn.addEventListener('click', () => aboutModal.classList.add('hidden'));
+    }
+
     // -----------------------------------------------------------------------------
     // Initializer
     // -----------------------------------------------------------------------------
     async function init() {
         console.log("Initializing application...");
         initializeMap();
+        setupEventListeners();
 
         // Handle Auth
         supabase.auth.onAuthStateChange(async (event, session) => {
@@ -292,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPois();
         renderPoiList();
         drawTourRoute();
+        setMode('view'); // Set initial mode to view, which will show "Edit" button for editors
     }
 
     function populateLanguageSelector() {
