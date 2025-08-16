@@ -580,7 +580,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPoiList();
         drawTourRoute();
     }
-    }
 
     async function createNewGuide() {
         const formHTML = `
