@@ -1,18 +1,5 @@
-# WayWhispery - Versión Vanilla JS + Supabase
 
-Este proyecto es una versión "solo frontend" de la aplicación WayWhispery, diseñada para ser desplegada como un sitio estático en plataformas como GitHub Pages. Utiliza HTML, CSS y JavaScript "vanilla" (sin frameworks de compilación) y se conecta directamente a [Supabase](https://supabase.com) para la autenticación, base de datos y almacenamiento de archivos.
 
-La versión original, una PWA con funcionalidades de mapa interactivo, se ha conservado en el fichero `README_PWA.md`.
-
-## Características
-
--   **Sitio Estático**: Rápido, seguro y fácil de desplegar.
--   **Backend con Supabase**:
-    -   **Autenticación**: Login con Google (OAuth).
-    -   **Base de Datos**: PostgreSQL con políticas de seguridad a nivel de fila (RLS).
-    -   **Almacenamiento**: Gestión de imágenes de portada para las guías.
--   **Roles de Usuario**:
-    -   **Visitante (anónimo)**: Puede ver todas las guías publicadas.
     -   **Viewer (registrado)**: Rol base para usuarios autenticados.
     -   **Editor/Admin**: Puede crear, editar, publicar y eliminar guías.
 -   **Despliegue Continuo**: Automatizado con GitHub Actions para publicar en GitHub Pages.
@@ -52,7 +39,6 @@ La aplicación cliente necesita conocer la URL y la clave anónima de tu proyect
 3.  Reemplaza los valores de los placeholders con tu propia URL y clave anónima que obtuviste en el primer paso.
 
 ### 4. Ejecutar Localmente
-
 Para probar el sitio en tu máquina local:
 
 1.  Necesitas un servidor web simple para servir los ficheros estáticos. Si tienes Python instalado, puedes usar:
@@ -61,7 +47,7 @@ Para probar el sitio en tu máquina local:
     cd /ruta/a/Alhambra-guide
     # Inicia un servidor en el puerto 8000
     python3 -m http.server 8000
-    ```
+    ``
 2.  Abre tu navegador y ve a `http://localhost:8000`.
 
 **¡Importante!** Recuerda añadir `http://localhost:8000` a tus URLs de redirección en Supabase para que el login con Google funcione localmente.
@@ -70,7 +56,7 @@ Para probar el sitio en tu máquina local:
 
 El despliegue en GitHub Pages está automatizado. Cada vez que se realiza un `push` a la rama `main`, una GitHub Action se encarga de publicar el contenido de la carpeta `vanilla-dist`.
 
-Consulta la guía de publicación para más detalles:
+Consulta la guía de publicación para más detalles
 **➡️ [`docs/PUBLISHING.md`](./docs/PUBLISHING.md)**
 
 ## Documentación Adicional
@@ -132,14 +118,4 @@ This table defines the tags that can be associated with guides.
 This is a join table for the many-to-many relationship between guides and tags.
 
 - `guide_id` (uuid): References the `id` of the guide.
-- `tag_id` (uuid): References the `id` of the tag.
-
-### `media`
-
-This table stores references to media files associated with a guide.
-
-- `id` (uuid, primary key): A unique identifier for the media file.
-- `guide_id` (uuid): References the `id` of the guide this media file belongs to.
-- `url` (text): The URL of the media file.
-- `alt` (text): Alternative text for the media file (for accessibility).
-- `kind` (text): The type of media, e.g., 'image', 'video'.
+- `tag_id` (uuid): References
