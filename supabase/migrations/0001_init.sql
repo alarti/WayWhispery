@@ -31,7 +31,10 @@ CREATE TABLE guides (
     status TEXT CHECK (status IN ('draft', 'published')) DEFAULT 'draft' NOT NULL,
     author_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    initial_lat DOUBLE PRECISION,
+    initial_lon DOUBLE PRECISION,
+    initial_zoom INTEGER
 );
 
 -- -----------------------------------------------------------------------------
