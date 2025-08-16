@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía de la Alhambra - Edición Vanilla</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module" src="app.js"></script>
+</head>
+<body>
+
+    <header>
+        <h1>Guía de la Alhambra</h1>
+        <div id="auth-container">
+            <!-- El estado de la autenticación se renderizará aquí -->
+            <button id="login-btn">Continuar con Google</button>
+        </div>
+    </header>
+
+    <main>
+        <div id="user-info" class="hidden">
+            <p>Conectado como: <span id="user-email"></span> (<span id="user-role"></span>)</p>
+        </div>
+
+        <div id="editor-controls" class="hidden">
+            <h2>Panel de Editor</h2>
+            <button id="new-guide-btn">Crear Nueva Guía</button>
+            <hr>
+        </div>
+
+        <div id="guides-container">
+            <div class="guides-header">
+                <h2>Guías Publicadas</h2>
+                <div id="filters-container">
+                    <!-- Filtros se añadirán aquí -->
+                </div>
+            </div>
+            <div id="guides-list">
+                <!-- La lista de guías se cargará aquí -->
+                <p>Cargando guías...</p>
+            </div>
+            <div id="pagination-container" class="hidden">
+                <button id="load-more-btn">Cargar más</button>
+            </div>
+        </div>
+
+        <div id="guide-detail-container" class="hidden">
+            <!-- El detalle de la guía se mostrará aquí -->
+        </div>
+
+        <div id="guide-form-container" class="hidden">
+            <form id="guide-form">
+                <input type="hidden" id="guide-id">
+                <h2 id="form-title">Crear Nueva Guía</h2>
+
+                <label for="guide-title-input">Título:</label>
+                <input type="text" id="guide-title-input" required>
+
+                <label for="guide-slug-input">Slug (URL amigable):</label>
+                <input type="text" id="guide-slug-input" required pattern="[a-z0-9-]+">
+                <small>Solo letras minúsculas, números y guiones.</small>
+
+                <label for="guide-summary-input">Resumen:</label>
+                <textarea id="guide-summary-input" rows="3"></textarea>
+
+                <label for="guide-language-input">Idioma:</label>
+                <input type="text" id="guide-language-input" required value="es">
+
+                <label for="guide-status-select">Estado:</label>
+                <select id="guide-status-select">
+                    <option value="draft">Borrador (Draft)</option>
+                    <option value="published">Publicado (Published)</option>
+                </select>
+
+                <label for="guide-cover-input">Imagen de Portada:</label>
+                <input type="file" id="guide-cover-input" accept="image/png, image/jpeg, image/webp">
+                <img id="cover-preview" src="" alt="Vista previa de la portada" class="hidden" style="max-width: 200px; margin-top: 10px;">
+
+                <hr>
+                <h3>Secciones de la Guía</h3>
+                <div id="sections-list">
+                    <!-- Las secciones se renderizarán aquí -->
+                </div>
+                <button type="button" id="add-section-btn">Añadir Sección</button>
+                <hr>
+
+                <div class="form-actions">
+                    <button type="button" id="cancel-edit-btn">Cancelar</button>
+                    <button type="submit">Guardar Guía</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer>
+        <p>Sitio estático creado con Vanilla JS y Supabase. Desplegado en GitHub Pages.</p>
+    </footer>
+
+</body>
+</html>

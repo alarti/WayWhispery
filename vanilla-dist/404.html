@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página no encontrada</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            padding: 4rem;
+            background-color: #FFF8E1;
+            color: #333;
+        }
+        h1 {
+            font-size: 3rem;
+            color: #8B0000;
+        }
+        p {
+            font-size: 1.2rem;
+        }
+        a {
+            color: #8B0000;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>Error 404</h1>
+    <p>La página que buscas no existe.</p>
+    <p>Es posible que el enlace esté roto o que la página haya sido eliminada.</p>
+    <p><a href="/">Volver a la página de inicio</a></p>
+
+    <!-- Script para gestionar redirecciones en GitHub Pages con SPAs -->
+    <script>
+        // GitHub Pages puede servir esta página para cualquier ruta no encontrada.
+        // Este script intenta redirigir al usuario a la ruta correcta usando un hash.
+        // No es estrictamente necesario para nuestro enfoque con parámetros de URL,
+        // pero es una buena práctica para SPAs en GitHub Pages.
+        const path = window.location.pathname;
+        if (path !== '/' && path !== '/404.html') {
+            // Intenta redirigir a la página de inicio.
+            // Una lógica más avanzada podría intentar preservar la ruta.
+            console.log(`Redirigiendo desde la ruta no encontrada: ${path}`);
+            // window.location.href = '/'; // Descomentar si se quiere forzar la redirección.
+        }
+    </script>
+</body>
+</html>
