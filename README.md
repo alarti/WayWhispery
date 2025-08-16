@@ -1,6 +1,6 @@
-# Alhambra Guide - Versión Vanilla JS + Supabase
+# WayWisper - Versión Vanilla JS + Supabase
 
-Este proyecto es una versión "solo frontend" de la aplicación Alhambra Guide, diseñada para ser desplegada como un sitio estático en plataformas como GitHub Pages. Utiliza HTML, CSS y JavaScript "vanilla" (sin frameworks de compilación) y se conecta directamente a [Supabase](https://supabase.com) para la autenticación, base de datos y almacenamiento de archivos.
+Este proyecto es una versión "solo frontend" de la aplicación WayWisper, diseñada para ser desplegada como un sitio estático en plataformas como GitHub Pages. Utiliza HTML, CSS y JavaScript "vanilla" (sin frameworks de compilación) y se conecta directamente a [Supabase](https://supabase.com) para la autenticación, base de datos y almacenamiento de archivos.
 
 La versión original, una PWA con funcionalidades de mapa interactivo, se ha conservado en el fichero `README_PWA.md`.
 
