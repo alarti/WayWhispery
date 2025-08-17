@@ -79,6 +79,23 @@ html, body {
     display: flex;
     flex-direction: column;
     z-index: 1000;
+    transition: width 0.3s ease-in-out;
+}
+@media (max-width: 768px) {
+    .sidebar {
+        position: absolute;
+        left: 50px; /* Activity bar width */
+        height: 100%;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease-in-out;
+    }
+    .sidebar.collapsed {
+        transform: translateX(-100%);
+    }
+    .sidebar.active {
+        transform: translateX(0);
+    }
 }
 .sidebar-header {
     display: flex;

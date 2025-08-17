@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Layout & UI Logic
     // -----------------------------------------------------------------------------
+    const isMobile = () => window.innerWidth <= 768;
+
     function setupEventListeners() {
         // Main layout
         activityGuidesBtn.addEventListener('click', () => switchSidebarView('guides'));
@@ -120,6 +122,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchSidebarView(viewName) {
+        const sidebar = document.querySelector('.sidebar');
+        const isCollapsed = !sidebar.classList.contains('active');
+
         if (viewName === 'guides') {
             sidebarGuidesView.classList.add('active');
             sidebarMapView.classList.remove('active');
@@ -130,6 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
             sidebarMapView.classList.add('active');
             activityGuidesBtn.classList.remove('active');
             activityMapBtn.classList.add('active');
+        }
+
+        // On mobile, clicking an activity button should always show the sidebar
+        if (isMobile() && isCollapsed) {
+            sidebar.classList.add('active');
         }
     }
 
@@ -387,6 +397,10 @@ document.addEventListener('DOMContentLoaded', () => {
         map.setView([currentGuide.initial_lat, currentGuide.initial_lon], currentGuide.initial_zoom);
         updateMapView();
         switchSidebarView('map');
+
+        if (isMobile()) {
+            document.querySelector('.sidebar').classList.remove('active');
+        }
     }
 
     function populateLanguageSelector() {
@@ -536,6 +550,10 @@ document.addEventListener('DOMContentLoaded', () => {
         visitedPois.add(poiId);
         renderPoiList();
         drawTourRoute();
+
+        if (isMobile()) {
+            document.querySelector('.sidebar').classList.remove('active');
+        }
     }
 
     function onMapClick(e) {
