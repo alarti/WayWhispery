@@ -729,7 +729,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const splashCloseBtn = document.getElementById('splash-close-btn');
 
         const hideSplash = () => splashScreen.classList.add('hidden');
-        splashCloseBtn.addEventListener('click', hideSplash);
+        if (splashCloseBtn) {
+            splashCloseBtn.addEventListener('click', hideSplash);
+        }
 
         try {
             initializeMap();
