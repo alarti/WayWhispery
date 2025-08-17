@@ -353,7 +353,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const lang = guide.default_lang || 'en';
-            const guideDetails = details_obj?.[lang] || { title: 'Untitled', summary: '' };
+            const firstAvailableLang = Object.keys(details_obj || {})[0];
+            const guideDetails = details_obj?.[lang] || details_obj?.[firstAvailableLang] || { title: 'Untitled', summary: '' };
+
             const title = guideDetails.title;
             const summary = guideDetails.summary;
 
