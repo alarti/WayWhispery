@@ -18,8 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
     // -----------------------------------------------------------------------------
     // Layout
-    const activityGuidesBtn = document.getElementById('activity-guides-btn');
     const activityMapBtn = document.getElementById('activity-map-btn');
+    const sidebarLogo = document.getElementById('sidebar-logo');
+    const sidebarViewTitle = document.getElementById('sidebar-view-title');
+    const sidebarHeaderControls = document.getElementById('sidebar-header-controls');
     const sidebarGuidesView = document.getElementById('sidebar-guides-view');
     const sidebarMapView = document.getElementById('sidebar-map-view');
 
@@ -28,11 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Guides View
     const guideCatalogList = document.getElementById('guide-catalog-list');
-    const createNewGuideBtn = document.getElementById('create-new-guide-btn');
 
     // Map View
-    const guideTitleSidebar = document.getElementById('guide-title-sidebar');
-    const modeControlsSidebar = document.getElementById('mode-controls-sidebar');
     const guideMetaContainer = document.getElementById('guide-meta-container');
     const authorNameSpan = document.getElementById('author-name');
     const poiList = document.getElementById('poi-list');
@@ -93,9 +92,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupEventListeners() {
         // Main layout
-        activityGuidesBtn.addEventListener('click', () => switchSidebarView('guides'));
+        sidebarLogo.addEventListener('click', () => switchSidebarView('guides'));
         activityMapBtn.addEventListener('click', () => switchSidebarView('map'));
-        createNewGuideBtn.addEventListener('click', createNewGuide);
 
         // Modals
         formModalCloseBtn.onclick = () => hideFormModal();
@@ -125,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function switchSidebarView(viewName) {
         const sidebar = document.querySelector('.sidebar');
-        const newActiveBtn = document.getElementById(`activity-${viewName}-btn`);
+        const newActiveBtn = viewName === 'map' ? activityMapBtn : sidebarLogo;
         const isAlreadyActive = newActiveBtn.classList.contains('active');
 
         // If the clicked button's view is already active, just toggle visibility
@@ -134,21 +132,22 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Switch content view
+        activityMapBtn.classList.remove('active');
+        sidebarLogo.classList.remove('active');
+        newActiveBtn.classList.add('active');
+
         if (viewName === 'guides') {
             sidebarGuidesView.classList.add('active');
             sidebarMapView.classList.remove('active');
-            activityGuidesBtn.classList.add('active');
-            activityMapBtn.classList.remove('active');
+            sidebarViewTitle.textContent = 'All Guides';
         } else if (viewName === 'map') {
             sidebarGuidesView.classList.remove('active');
             sidebarMapView.classList.add('active');
-            activityGuidesBtn.classList.remove('active');
-            activityMapBtn.classList.add('active');
+            sidebarViewTitle.textContent = currentGuide?.title || 'Guide Details';
         }
 
-        // And make sure the sidebar is visible
         sidebar.classList.remove('collapsed');
+        updateHeaderControls();
     }
 
     function updateUIforAuth() {
@@ -160,24 +159,25 @@ document.addEventListener('DOMContentLoaded', () => {
             authContainer.innerHTML = `<button id="login-btn" class="activity-btn" title="Login"><i class="fas fa-sign-in-alt"></i></button>`;
             authContainer.querySelector('#login-btn').addEventListener('click', loginWithGoogle);
         }
-        createNewGuideBtn.classList.toggle('hidden', !isEditor);
+        updateHeaderControls();
     }
 
     function updateMapView() {
         if (currentGuide) {
-            guideTitleSidebar.textContent = currentGuide.title;
+            sidebarViewTitle.textContent = currentGuide.title;
             authorNameSpan.textContent = currentGuide.author?.email || 'Unknown';
             guideMetaContainer.classList.remove('hidden');
             renderPoiList();
             renderPois();
             drawTourRoute();
-            setMode('view'); // Always start in view mode
         } else {
-            guideTitleSidebar.textContent = 'No Guide Loaded';
+            sidebarViewTitle.textContent = 'All Guides';
             authorNameSpan.textContent = '';
             guideMetaContainer.classList.add('hidden');
             poiList.innerHTML = '';
         }
+        updateHeaderControls();
+        setMode('view');
     }
 
     // -----------------------------------------------------------------------------
@@ -484,38 +484,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Edit Mode & CRUD
     // -----------------------------------------------------------------------------
+    function updateHeaderControls() {
+        sidebarHeaderControls.innerHTML = '';
+        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+        if (!isEditor) return;
+
+        const currentView = sidebarGuidesView.classList.contains('active') ? 'guides' : 'map';
+
+        if (currentView === 'guides') {
+            const createBtn = document.createElement('button');
+            createBtn.className = 'btn-modern btn-modern-sm';
+            createBtn.innerHTML = '<i class="fas fa-plus"></i> New';
+            createBtn.onclick = createNewGuide;
+            sidebarHeaderControls.appendChild(createBtn);
+        } else if (currentView === 'map' && currentGuide) {
+            setMode(isEditMode ? 'edit' : 'view'); // Re-render controls for map view
+        }
+    }
+
     function setMode(mode) {
         isEditMode = mode === 'edit';
-        modeControlsSidebar.innerHTML = '';
+        sidebarHeaderControls.innerHTML = ''; // Clear existing controls
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
         if (!isEditor || !currentGuide) return;
 
         if (isEditMode) {
             map.on('click', onMapClick);
-            const saveBtn = document.createElement('button');
-            saveBtn.className = 'btn-modern btn-modern-sm';
-            saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
-            saveBtn.onclick = saveGuide;
-            modeControlsSidebar.appendChild(saveBtn);
-
-            const exitBtn = document.createElement('button');
-            exitBtn.className = 'btn-modern btn-modern-sm btn-modern-secondary';
-            exitBtn.innerHTML = '<i class="fas fa-times"></i> Exit';
-            exitBtn.onclick = () => setMode('view');
-            modeControlsSidebar.appendChild(exitBtn);
-
-            const exportBtn = document.createElement('button');
-            exportBtn.className = 'btn-modern btn-modern-sm btn-modern-secondary';
-            exportBtn.innerHTML = '<i class="fas fa-file-export"></i> Export for Translation';
-            exportBtn.onclick = exportForTranslation;
-            modeControlsSidebar.appendChild(exportBtn);
+            sidebarHeaderControls.innerHTML = `
+                <button id="save-guide-btn" class="btn-modern btn-modern-sm" title="Save Guide"><i class="fas fa-save"></i></button>
+                <button id="export-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export for Translation"><i class="fas fa-file-export"></i></button>
+                <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit Edit Mode"><i class="fas fa-times"></i></button>
+            `;
+            sidebarHeaderControls.querySelector('#save-guide-btn').onclick = saveGuide;
+            sidebarHeaderControls.querySelector('#export-guide-btn').onclick = exportForTranslation;
+            sidebarHeaderControls.querySelector('#exit-edit-btn').onclick = () => setMode('view');
         } else {
             map.off('click', onMapClick);
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn-modern btn-modern-sm';
-            editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit Guide';
-            editBtn.onclick = () => setMode('edit');
-            modeControlsSidebar.appendChild(editBtn);
+            sidebarHeaderControls.innerHTML = `
+                <button id="edit-guide-btn" class="btn-modern btn-modern-sm" title="Edit Guide"><i class="fas fa-edit"></i></button>
+            `;
+            sidebarHeaderControls.querySelector('#edit-guide-btn').onclick = () => setMode('edit');
         }
         renderPois();
         renderPoiList();
@@ -716,7 +724,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Initializer
     // -----------------------------------------------------------------------------
-    async function init() {
+    async init() {
+        // Hide splash screen after a delay
+        setTimeout(() => {
+            document.getElementById('splash-screen').classList.add('hidden');
+        }, 2500);
+
         initializeMap();
         setupEventListeners();
 

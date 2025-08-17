@@ -8,15 +8,15 @@
   "theme_color": "#8B0000",
   "icons": [
     {
-      "src": "assets/icons/icon-192x192.png",
+      "src": "assets/icons/waywispery-icon.jpeg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     },
     {
-      "src": "assets/icons/icon-512x512.png",
+      "src": "assets/icons/waywispery-icon.jpeg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ]

@@ -17,10 +17,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="modal-overlay">
+        <div class="modal-content text-center">
+            <img src="assets/icons/waywispery-icon.jpeg" alt="WayWhispery Logo" class="splash-logo">
+            <h1>WayWhispery</h1>
+            <p class="splash-marketing">Your interactive guide to the world.</p>
+            <hr>
+            <div class="splash-details">
+                <p><strong>Author:</strong> Alberto Arce</p>
+                <p><strong>Date:</strong> 2024</p>
+                <p><strong>Technology:</strong> Vanilla JS, Supabase, Leaflet</p>
+            </div>
+            <div id="splash-loader" class="loader"></div>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Activity Bar -->
         <div class="activity-bar">
-            <button id="activity-guides-btn" class="activity-btn active" title="Guides"><i class="fas fa-list-ul"></i></button>
             <button id="activity-map-btn" class="activity-btn" title="Map Details"><i class="fas fa-map-marked-alt"></i></button>
             <div class="spacer"></div>
             <div id="auth-container-activity">
@@ -30,12 +45,17 @@
 
         <!-- Sidebar -->
         <div class="sidebar">
+            <!-- Sidebar Header with Logo -->
+            <div class="sidebar-header">
+                <img src="assets/icons/waywispery-icon.jpeg" alt="Logo" id="sidebar-logo">
+                <h3 id="sidebar-view-title">All Guides</h3>
+                <div id="sidebar-header-controls">
+                    <!-- Create/Edit buttons will go here -->
+                </div>
+            </div>
+
             <!-- Guides View -->
             <div id="sidebar-guides-view" class="sidebar-view active">
-                <div class="sidebar-header">
-                    <h3>All Guides</h3>
-                    <button id="create-new-guide-btn" class="btn-modern btn-modern-sm hidden" title="Create New Guide"><i class="fas fa-plus"></i></button>
-                </div>
                 <div id="guide-catalog-list" class="sidebar-content">
                     <!-- List of guides will be populated here -->
                 </div>
@@ -43,12 +63,6 @@
 
             <!-- Map Details View -->
             <div id="sidebar-map-view" class="sidebar-view">
-                <div class="sidebar-header">
-                    <h3 id="guide-title-sidebar">Guide Details</h3>
-                    <div id="mode-controls-sidebar">
-                        <!-- Edit/Save buttons will be populated here -->
-                    </div>
-                </div>
                 <div class="sidebar-content">
                     <div id="guide-meta-container">
                         <p class="text-muted">by <span id="author-name"></span></p>
