@@ -66,10 +66,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const synth = window.speechSynthesis;
     let utterance = new SpeechSynthesisUtterance();
 
+    const introPhrases = {
+        en: ["You have arrived at", "You are now at", "This is"],
+        es: ["Has llegado a", "Te encuentras en", "Esto es"],
+    };
+
     // State
     let currentGuide = null;
     let pois = [];
     let tourRoute = [];
+    let visitedPois = new Set();
     let currentUser = null;
     let userProfile = null;
     let isEditMode = false;
@@ -240,7 +246,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (newTriggerId && newTriggerId !== lastTriggeredPoiId) {
             lastTriggeredPoiId = newTriggerId;
-            const fullDescription = `You have arrived at ${inRangeOfPoi.name}. ${inRangeOfPoi.description}`;
+
+            // Mark as visited and update UI
+            visitedPois.add(newTriggerId);
+            renderPoiList();
+            drawTourRoute();
+
+            const intros = introPhrases[currentGuide?.language || 'en'] || introPhrases.en;
+            const randomIntro = intros[Math.floor(Math.random() * intros.length)];
+            const fullDescription = `${randomIntro} ${inRangeOfPoi.name}. ${inRangeOfPoi.description}`;
+
             updateGuideText(fullDescription);
             speak(fullDescription);
             poiMarkers[newTriggerId]?.openPopup();
@@ -270,7 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const startPoi = pois.find(p => p.id === tourRoute[i]);
             const endPoi = pois.find(p => p.id === tourRoute[i + 1]);
             if (startPoi && endPoi) {
-                const line = L.polyline([[startPoi.lat, startPoi.lon], [endPoi.lat, endPoi.lon]], { color: '#3388ff', weight: 3, opacity: 0.7 }).addTo(map);
+                const isVisited = visitedPois.has(endPoi.id);
+                const color = isVisited ? '#66CDAA' : '#3388ff';
+                const line = L.polyline([[startPoi.lat, startPoi.lon], [endPoi.lat, endPoi.lon]], { color: color, weight: 3, opacity: 0.7 }).addTo(map);
                 routePolylines.push(line);
             }
         }
@@ -378,6 +395,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="btn-modern btn-modern-sm btn-modern-danger delete-poi-btn" data-id="${poi.id}"><i class="fas fa-trash"></i></button>
                 `;
                 li.appendChild(btnGroup);
+            }
+            if (visitedPois.has(poi.id)) {
+                li.classList.add('visited');
             }
             poiList.appendChild(li);
         });

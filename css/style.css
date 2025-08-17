@@ -154,6 +154,11 @@ html, body {
 .list-group-item:hover {
     background-color: rgba(102, 205, 170, 0.1);
 }
+.list-group-item.visited {
+    background-color: rgba(102, 205, 170, 0.2);
+    text-decoration: line-through;
+    color: var(--ww-text-secondary);
+}
 
 /* --- Buttons --- */
 .btn-modern {
