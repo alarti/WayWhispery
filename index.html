@@ -54,6 +54,13 @@
                         <p class="text-muted">by <span id="author-name"></span></p>
                     </div>
                     <hr>
+                    <div class="sidebar-controls">
+                        <div class="form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="live-mode-toggle">
+                            <label class="form-check-label" for="live-mode-toggle">Live GPS Mode</label>
+                        </div>
+                    </div>
+                    <hr>
                     <h5>Points of Interest</h5>
                     <div id="poi-list-container">
                         <ul id="poi-list" class="list-group list-group-flush">
@@ -67,6 +74,14 @@
         <!-- Main Content -->
         <div class="main-content">
             <div id="map-container"></div>
+            <div id="guide-text-overlay" class="hidden">
+                <p></p>
+            </div>
+            <div id="controls" class="hidden">
+                <button id="play-btn" class="btn-modern"><i class="fas fa-play"></i></button>
+                <button id="pause-btn" class="btn-modern"><i class="fas fa-pause"></i></button>
+                <button id="stop-btn" class="btn-modern"><i class="fas fa-stop"></i></button>
+            </div>
         </div>
     </div>
 

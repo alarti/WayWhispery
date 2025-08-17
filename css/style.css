@@ -262,3 +262,43 @@ html, body {
 .hidden {
     display: none !important;
 }
+
+/* --- Map Overlays --- */
+#guide-text-overlay {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    background-color: rgba(24, 36, 36, 0.8);
+    backdrop-filter: blur(5px);
+    color: var(--ww-text-light);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--ww-border-color);
+    z-index: 999;
+    max-height: 100px;
+    overflow-y: auto;
+}
+#guide-text-overlay p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+#controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+}
+#controls .btn-modern {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

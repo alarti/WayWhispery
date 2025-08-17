@@ -37,6 +37,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const authorNameSpan = document.getElementById('author-name');
     const poiList = document.getElementById('poi-list');
 
+    // Map Overlays & Controls
+    const guideTextOverlay = document.getElementById('guide-text-overlay');
+    const guideTextP = guideTextOverlay.querySelector('p');
+    const controlsContainer = document.getElementById('controls');
+    const liveModeToggle = document.getElementById('live-mode-toggle');
+    const playBtn = document.getElementById('play-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+    const stopBtn = document.getElementById('stop-btn');
+
     // Modal
     const formModal = document.getElementById('form-modal');
     const formModalTitle = document.getElementById('form-modal-title');
@@ -48,6 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     let map;
     const poiMarkers = {};
+    let userMarker;
+    let geolocationId;
+    let lastTriggeredPoiId = null;
+    const PROXIMITY_THRESHOLD = 20; // meters
+
+    // TTS
+    const synth = window.speechSynthesis;
+    let utterance = new SpeechSynthesisUtterance();
+
+    // State
     let currentGuide = null;
     let pois = [];
     let tourRoute = [];
@@ -58,9 +77,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Layout & UI Logic
     // -----------------------------------------------------------------------------
-    function setupLayoutListeners() {
+    function setupEventListeners() {
+        // Main layout
         activityGuidesBtn.addEventListener('click', () => switchSidebarView('guides'));
         activityMapBtn.addEventListener('click', () => switchSidebarView('map'));
+        createNewGuideBtn.addEventListener('click', createNewGuide);
+
+        // Modals
+        formModalCloseBtn.onclick = () => hideFormModal();
+
+        // Live Mode & TTS Controls
+        liveModeToggle.addEventListener('change', () => {
+            if (liveModeToggle.checked) {
+                startGpsTracking();
+                controlsContainer.classList.remove('hidden');
+            } else {
+                stopGpsTracking();
+                controlsContainer.classList.add('hidden');
+                guideTextOverlay.classList.add('hidden');
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (synth.paused) { synth.resume(); }
+            else if (lastTriggeredPoiId) {
+                const poi = pois.find(p => p.id === lastTriggeredPoiId);
+                if (poi) speak(poi.description);
+            }
+        });
+        pauseBtn.addEventListener('click', () => { if (synth.speaking) synth.pause(); });
+        stopBtn.addEventListener('click', () => { if (synth.speaking) synth.cancel(); });
     }
 
     function switchSidebarView(viewName) {
@@ -107,13 +153,100 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -----------------------------------------------------------------------------
-    // Map Logic
+    // Map Logic & GPS / TTS
     // -----------------------------------------------------------------------------
     function initializeMap() {
         map = L.map('map-container').setView([40.4167, -3.7038], 5); // Default to Spain
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3;
+        const φ1 = lat1 * Math.PI/180; const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2-lat1) * Math.PI/180; const Δλ = (lon2-lon1) * Math.PI/180;
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    function speak(text) {
+        if (synth.speaking) synth.cancel();
+        utterance.text = text;
+        // utterance.lang = 'es-ES'; // This should be set based on guide lang
+        synth.speak(utterance);
+    }
+
+    function updateGuideText(text) {
+        guideTextOverlay.classList.remove('hidden');
+        guideTextP.textContent = text;
+    }
+
+    function startGpsTracking() {
+        if (geolocationId) navigator.geolocation.clearWatch(geolocationId);
+        if (navigator.geolocation) {
+            geolocationId = navigator.geolocation.watchPosition(showPosition,
+                (err) => { alert(`GPS Error: ${err.message}`); },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    }
+
+    function stopGpsTracking() {
+        if (geolocationId) {
+            navigator.geolocation.clearWatch(geolocationId);
+            geolocationId = null;
+        }
+        if(userMarker) {
+            userMarker.remove();
+            userMarker = null;
+        }
+    }
+
+    function showPosition(position) {
+        const { latitude: lat, longitude: lon } = position.coords;
+        if (!userMarker) {
+            createUserMarker(lat, lon);
+        } else {
+            userMarker.setLatLng([lat, lon]);
+        }
+        checkProximity(lat, lon);
+    }
+
+    function createUserMarker(lat, lon) {
+        const userIcon = L.divIcon({
+            html: '<div style="background-color: blue; width: 15px; height: 15px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>',
+            className: '',
+            iconSize: [15, 15],
+            iconAnchor: [9, 9]
+        });
+        userMarker = L.marker([lat, lon], { icon: userIcon }).addTo(map);
+    }
+
+    function checkProximity(lat, lon) {
+        if (!pois || pois.length === 0) return;
+
+        let closestPoi = pois.reduce((closest, poi) => {
+            const distance = getDistance(lat, lon, poi.lat, poi.lon);
+            if (distance < closest.distance) return { ...poi, distance };
+            return closest;
+        }, { distance: Infinity });
+
+        const inRangeOfPoi = closestPoi.distance < PROXIMITY_THRESHOLD ? closestPoi : null;
+        const newTriggerId = inRangeOfPoi ? inRangeOfPoi.id : null;
+
+        if (newTriggerId && newTriggerId !== lastTriggeredPoiId) {
+            lastTriggeredPoiId = newTriggerId;
+            const fullDescription = `You have arrived at ${inRangeOfPoi.name}. ${inRangeOfPoi.description}`;
+            updateGuideText(fullDescription);
+            speak(fullDescription);
+            poiMarkers[newTriggerId]?.openPopup();
+        } else if (!newTriggerId && lastTriggeredPoiId) {
+            lastTriggeredPoiId = null;
+        }
     }
 
     function renderPois() {
