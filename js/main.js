@@ -763,6 +763,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Replace direct call with DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', init);
+    init();
+    //document.addEventListener('DOMContentLoaded', init);
+
 });
 
