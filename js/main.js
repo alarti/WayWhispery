@@ -404,14 +404,22 @@ document.addEventListener('DOMContentLoaded', () => {
         currentGuide.current_lang = langCode;
         languageSelector.value = langCode;
 
-        // Update guide title and summary from JSONB, with fallbacks
-        const guideDetails = currentGuide.details?.[langCode] || currentGuide.details?.[currentGuide.default_lang] || {};
+        // Safely parse guide details
+        let guideDetailsObj = currentGuide.details;
+        if (typeof guideDetailsObj === 'string') {
+            try { guideDetailsObj = JSON.parse(guideDetailsObj); } catch (e) { guideDetailsObj = {}; }
+        }
+        const guideDetails = guideDetailsObj?.[langCode] || guideDetailsObj?.[currentGuide.default_lang] || {};
         currentGuide.title = guideDetails.title || 'Untitled Guide';
         currentGuide.summary = guideDetails.summary || '';
 
-        // Update each POI with the text for the selected language, with fallbacks
+        // Safely parse POI texts
         pois.forEach(poi => {
-            const poiTexts = poi.texts?.[langCode] || poi.texts?.[currentGuide.default_lang] || {};
+            let poiTextsObj = poi.texts;
+            if (typeof poiTextsObj === 'string') {
+                try { poiTextsObj = JSON.parse(poiTextsObj); } catch (e) { poiTextsObj = {}; }
+            }
+            const poiTexts = poiTextsObj?.[langCode] || poiTextsObj?.[currentGuide.default_lang] || {};
             poi.name = poiTexts.title || 'Untitled POI';
             poi.description = poiTexts.description || '';
         });
