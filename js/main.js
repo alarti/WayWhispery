@@ -506,7 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     async function init() {
         initializeMap();
-        setupLayoutListeners();
+        setupEventListeners();
 
         supabase.auth.onAuthStateChange(async (event, session) => {
             currentUser = session?.user || null;
