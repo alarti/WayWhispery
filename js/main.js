@@ -179,9 +179,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadGuide(slug) {
         const { data: guideData, error } = await supabase.from('guides').select('*, author:profiles(email)').eq('slug', slug).single();
-        if (error || !guideData) { return; }
+        if (error || !guideData) {
+            alert(`Error loading guide: ${error?.message || 'Guide not found.'}`);
+            return;
+        }
         const { data: sectionsData, error: sectionsError } = await supabase.from('guide_sections').select('*').eq('guide_id', guideData.id).order('order');
-        if (sectionsError) { return; }
+        if (sectionsError) {
+            alert(`Error loading guide sections: ${sectionsError.message}`);
+            return;
+        }
         currentGuide = guideData;
         pois = sectionsData.map(s => ({ ...s, name: s.title, description: s.body_md }));
         tourRoute = pois.map(p => p.id);
@@ -229,6 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         pois.forEach(poi => {
             const li = document.createElement('li');
             li.className = 'list-group-item';
+            li.dataset.poiId = poi.id;
             li.innerHTML = `<span>${poi.name}</span>`;
             if (isEditMode) {
                 const btnGroup = document.createElement('div');
@@ -243,8 +250,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Add event listeners after rendering
-        poiList.querySelectorAll('.edit-poi-btn').forEach(btn => btn.addEventListener('click', (e) => editPoi(e.currentTarget.dataset.id)));
-        poiList.querySelectorAll('.delete-poi-btn').forEach(btn => btn.addEventListener('click', (e) => deletePoi(e.currentTarget.dataset.id)));
+        poiList.querySelectorAll('.list-group-item').forEach(item => item.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-group')) return; // Don't fire if clicking buttons
+            flyToPoi(e.currentTarget.dataset.poiId);
+        }));
+        poiList.querySelectorAll('.edit-poi-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent li click from firing
+            editPoi(e.currentTarget.dataset.id);
+        }));
+        poiList.querySelectorAll('.delete-poi-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent li click from firing
+            deletePoi(e.currentTarget.dataset.id);
+        }));
+    }
+
+    function flyToPoi(poiId) {
+        const poi = pois.find(p => p.id === poiId);
+        if (!poi) return;
+
+        map.flyTo([poi.lat, poi.lon], 17); // Zoom in closer
+
+        // Open the popup on the corresponding marker
+        const marker = poiMarkers[poi.id];
+        if (marker) {
+            marker.openPopup();
+        }
     }
 
     function onMapClick(e) {
