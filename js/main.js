@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const guideMetaContainer = document.getElementById('guide-meta-container');
     const authorNameSpan = document.getElementById('author-name');
     const poiList = document.getElementById('poi-list');
+    const languageSelector = document.getElementById('language-selector');
 
     // Map Overlays & Controls
     const guideTextOverlay = document.getElementById('guide-text-overlay');
@@ -69,6 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const introPhrases = {
         en: ["You have arrived at", "You are now at", "This is"],
         es: ["Has llegado a", "Te encuentras en", "Esto es"],
+        fr: ["Vous êtes arrivé à", "Vous êtes maintenant à", "Voici"],
+        de: ["Sie sind angekommen bei", "Sie befinden sich jetzt bei", "Das ist"],
+        zh: ["您已到达", "您现在在", "这里是"]
     };
 
     // State
@@ -339,11 +343,53 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         currentGuide = guideData;
-        pois = sectionsData.map(s => ({ ...s, name: s.title, description: s.body_md }));
+        // The raw POI data now contains the JSONB 'texts' field
+        pois = sectionsData;
         tourRoute = pois.map(p => p.id);
+
+        populateLanguageSelector();
+        switchLanguage(currentGuide.default_lang); // Switch to default language
+
         map.setView([currentGuide.initial_lat, currentGuide.initial_lon], currentGuide.initial_zoom);
         updateMapView();
         switchSidebarView('map');
+    }
+
+    function populateLanguageSelector() {
+        languageSelector.innerHTML = '';
+        const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+        currentGuide.available_langs.forEach(langCode => {
+            const option = document.createElement('option');
+            option.value = langCode;
+            option.textContent = langMap[langCode] || langCode;
+            languageSelector.appendChild(option);
+        });
+        languageSelector.addEventListener('change', (e) => switchLanguage(e.target.value));
+    }
+
+    function switchLanguage(langCode) {
+        // Update the current language state
+        currentGuide.current_lang = langCode;
+        languageSelector.value = langCode;
+
+        // Update guide title and summary from JSONB
+        const guideDetails = currentGuide.details[langCode] || currentGuide.details[currentGuide.default_lang];
+        currentGuide.title = guideDetails.title;
+        currentGuide.summary = guideDetails.summary;
+
+        // Update each POI with the text for the selected language
+        pois.forEach(poi => {
+            const poiTexts = poi.texts[langCode] || poi.texts[currentGuide.default_lang];
+            poi.name = poiTexts.title;
+            poi.description = poiTexts.description;
+        });
+
+        // Update utterance language for TTS
+        const ttsLangMap = { en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN' };
+        utterance.lang = ttsLangMap[langCode] || 'en-US';
+
+        // Re-render the UI
+        updateMapView();
     }
 
     // -----------------------------------------------------------------------------
@@ -368,6 +414,12 @@ document.addEventListener('DOMContentLoaded', () => {
             exitBtn.innerHTML = '<i class="fas fa-times"></i> Exit';
             exitBtn.onclick = () => setMode('view');
             modeControlsSidebar.appendChild(exitBtn);
+
+            const exportBtn = document.createElement('button');
+            exportBtn.className = 'btn-modern btn-modern-sm btn-modern-secondary';
+            exportBtn.innerHTML = '<i class="fas fa-file-export"></i> Export for Translation';
+            exportBtn.onclick = exportForTranslation;
+            modeControlsSidebar.appendChild(exportBtn);
         } else {
             map.off('click', onMapClick);
             const editBtn = document.createElement('button');
@@ -508,6 +560,41 @@ document.addEventListener('DOMContentLoaded', () => {
         const { error } = await supabase.from('guide_sections').upsert(sectionsToSave);
         if (error) { alert(`Error saving: ${error.message}`); }
         else { alert('Guide saved!'); await loadGuide(currentGuide.slug); }
+    }
+
+    function exportForTranslation() {
+        if (!currentGuide) return;
+
+        const langToExport = currentGuide.default_lang;
+        const translationTemplate = {
+            guide: {
+                title: currentGuide.details[langToExport]?.title || '',
+                summary: currentGuide.details[langToExport]?.summary || ''
+            },
+            pois: {}
+        };
+
+        pois.forEach(poi => {
+            translationTemplate.pois[poi.id] = {
+                title: poi.texts[langToExport]?.title || '',
+                description: poi.texts[langToExport]?.description || ''
+            };
+        });
+
+        downloadJson(translationTemplate, `${currentGuide.slug}-translations.json`);
+    }
+
+    function downloadJson(data, filename) {
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     // -----------------------------------------------------------------------------
