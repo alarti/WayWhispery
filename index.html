@@ -4,130 +4,69 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WayWhispery</title>
-
     <link rel="stylesheet" href="css/style.css">
-
-    <!-- Leaflet Map Support -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-
-    <!-- Supabase Client -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- PWA Support -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1a1a1a"/>
-
-    <!-- Apple-specific meta tags for PWA -->
+    <meta name="theme-color" content="#1A3A3A"/>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="WayWhispery">
     <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-
-    <div id="map-container"></div>
-
-    <div id="side-panel">
-        <button id="panel-toggle-btn">☰</button>
-        <div class="panel-content">
-            <h1 id="guide-title">WayWhispery</h1>
-
-            <!-- Auth Section -->
-            <div id="auth-section">
-                <div id="auth-container">
-                    <!-- Login/logout button will be rendered here -->
-                </div>
-                <div id="user-info" class="hidden">
-                    <p>User: <span id="user-email"></span> (<span id="user-role"></span>)</p>
-                </div>
-            </div>
-            <hr>
-
-            <div id="guide-meta-container" class="hidden">
-                <p class="text-muted mb-2">by <span id="author-name"></span></p>
-                <a id="donation-link" href="#" target="_blank" rel="noopener noreferrer" class="btn-modern btn-modern-secondary btn-modern-sm">
-                    Support the author ☕
-                </a>
-            </div>
-            
-            <div class="mb-3">
-                <label for="language-selector" class="form-label">Language</label>
-                <select id="language-selector" class="form-select">
-                    <!-- Languages will be dynamically inserted here -->
-                </select>
-            </div>
-
-            <div class="form-check form-switch my-3">
-                <input class="form-check-input" type="checkbox" role="switch" id="simulation-mode-toggle" checked>
-                <label class="form-check-label" for="simulation-mode-toggle" data-key="simulationMode">Simulation Mode</label>
-            </div>
-
-            <div class="form-check form-switch my-3">
-                <input class="form-check-input" type="checkbox" role="switch" id="theme-toggle">
-                <label class="form-check-label" for="theme-toggle">Light Mode</label>
-            </div>
-            <hr>
-
-            <!-- Editor controls will be dynamically shown/hidden here -->
-            <div id="mode-controls" class="d-grid gap-2">
-                <!-- This will be populated by JS -->
-            </div>
-
-            <hr>
-
-            <div id="controls" class="d-grid gap-2">
-                <button id="play-btn" data-key="play">Play</button>
-                <button id="pause-btn" data-key="pause">Pause</button>
-                <button id="stop-btn" data-key="stop">Stop</button>
-            </div>
-
-            <hr>
-
-            <div id="poi-list-container">
-                <h5>Points of Interest</h5>
-                <ul id="poi-list" class="list-group list-group-flush">
-                    <!-- POIs will be dynamically inserted here -->
-                </ul>
-            </div>
-            
-            <div id="support-container" class="mt-4 d-grid gap-2">
-                <button id="about-btn" class="btn-modern btn-modern-secondary">About</button>
-                <a href="https://www.buymeacoffee.com/albertoarce" target="_blank" rel="noopener noreferrer" class="btn-modern btn-modern-secondary">
-                    Buy me a coffee ☕
-                </a>
+    <div class="app-container">
+        <!-- Activity Bar -->
+        <div class="activity-bar">
+            <button id="activity-guides-btn" class="activity-btn active" title="Guides"><i class="fas fa-list-ul"></i></button>
+            <button id="activity-map-btn" class="activity-btn" title="Map Details"><i class="fas fa-map-marked-alt"></i></button>
+            <div class="spacer"></div>
+            <div id="auth-container-activity">
+                <!-- Auth content will be injected here -->
             </div>
         </div>
-    </div>
 
-    <!-- Welcome modal to select a guide -->
-    <div id="welcome-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h2>Welcome to WayWhispery</h2>
-            <p>Choose a featured guide or create your own (as an editor).</p>
-            <div id="guide-catalog-list" class="list-group my-3">
-                <!-- Guide list will be populated from Supabase -->
-            </div>
-            <hr>
-            <div id="editor-actions" class="text-center">
-                <p class="text-muted">Are you an editor?</p>
-                <div id="welcome-auth-container">
-                    <!-- Login button will be rendered here if not logged in -->
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Guides View -->
+            <div id="sidebar-guides-view" class="sidebar-view active">
+                <div class="sidebar-header">
+                    <h3>All Guides</h3>
+                    <button id="create-new-guide-btn" class="btn-modern btn-modern-sm hidden" title="Create New Guide"><i class="fas fa-plus"></i></button>
                 </div>
-                <button id="create-new-guide-btn" class="btn-modern btn-modern-success hidden mt-2">Create a New Guide</button>
+                <div id="guide-catalog-list" class="sidebar-content">
+                    <!-- List of guides will be populated here -->
+                </div>
+            </div>
+
+            <!-- Map Details View -->
+            <div id="sidebar-map-view" class="sidebar-view">
+                <div class="sidebar-header">
+                    <h3 id="guide-title-sidebar">Guide Details</h3>
+                    <div id="mode-controls-sidebar">
+                        <!-- Edit/Save buttons will be populated here -->
+                    </div>
+                </div>
+                <div class="sidebar-content">
+                    <div id="guide-meta-container">
+                        <p class="text-muted">by <span id="author-name"></span></p>
+                    </div>
+                    <hr>
+                    <h5>Points of Interest</h5>
+                    <div id="poi-list-container">
+                        <ul id="poi-list" class="list-group list-group-flush">
+                            <!-- POIs will be dynamically inserted here -->
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- About Modal -->
-    <div id="about-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <button class="modal-close-btn">&times;</button>
-            <h2>About WayWhispery</h2>
-            <p>This application was developed by Alberto Arce.</p>
-            <p>An interactive audio guide to explore the wonders of the world.</p>
-            <p>
-                <a href="https://github.com/alarti" target="_blank" rel="noopener noreferrer">View on GitHub</a>
-            </p>
+        <!-- Main Content -->
+        <div class="main-content">
+            <div id="map-container"></div>
         </div>
     </div>
 
@@ -141,12 +80,8 @@
             </div>
         </div>
     </div>
-    
-    <div id="guide-text-overlay">
-        <p></p>
-    </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
