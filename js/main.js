@@ -80,6 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let pois = [];
     let tourRoute = [];
     let visitedPois = new Set();
+    let breadcrumbPath = [];
+    let breadcrumbLayer = null;
     let currentUser = null;
     let userProfile = null;
     let isEditMode = false;
@@ -123,8 +125,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function switchSidebarView(viewName) {
         const sidebar = document.querySelector('.sidebar');
-        const isCollapsed = !sidebar.classList.contains('active');
+        const newActiveBtn = document.getElementById(`activity-${viewName}-btn`);
+        const isAlreadyActive = newActiveBtn.classList.contains('active');
 
+        // If the clicked button's view is already active, just toggle visibility
+        if (isAlreadyActive) {
+            sidebar.classList.toggle('collapsed');
+            return;
+        }
+
+        // Switch content view
         if (viewName === 'guides') {
             sidebarGuidesView.classList.add('active');
             sidebarMapView.classList.remove('active');
@@ -137,10 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
             activityMapBtn.classList.add('active');
         }
 
-        // On mobile, clicking an activity button should always show the sidebar
-        if (isMobile() && isCollapsed) {
-            sidebar.classList.add('active');
-        }
+        // And make sure the sidebar is visible
+        sidebar.classList.remove('collapsed');
     }
 
     function updateUIforAuth() {
@@ -224,6 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
             userMarker.remove();
             userMarker = null;
         }
+        // Clear breadcrumbs when stopping GPS
+        breadcrumbPath = [];
+        if (breadcrumbLayer) {
+            breadcrumbLayer.remove();
+        }
     }
 
     function showPosition(position) {
@@ -233,6 +246,14 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             userMarker.setLatLng([lat, lon]);
         }
+
+        // Add to breadcrumb path every 10 meters
+        const lastBreadcrumb = breadcrumbPath[breadcrumbPath.length - 1];
+        if (!lastBreadcrumb || getDistance(lat, lon, lastBreadcrumb[0], lastBreadcrumb[1]) > 10) {
+            breadcrumbPath.push([lat, lon]);
+            drawBreadcrumbs();
+        }
+
         checkProximity(lat, lon);
     }
 
@@ -244,6 +265,16 @@ document.addEventListener('DOMContentLoaded', () => {
             iconAnchor: [9, 9]
         });
         userMarker = L.marker([lat, lon], { icon: userIcon }).addTo(map);
+    }
+
+    function drawBreadcrumbs() {
+        if (breadcrumbLayer) {
+            breadcrumbLayer.remove();
+        }
+        const breadcrumbMarkers = breadcrumbPath.map(pos =>
+            L.circleMarker(pos, { radius: 2, color: '#ff0000', fillColor: '#ff0000', fillOpacity: 0.8 })
+        );
+        breadcrumbLayer = L.layerGroup(breadcrumbMarkers).addTo(map);
     }
 
     function checkProximity(lat, lon) {
