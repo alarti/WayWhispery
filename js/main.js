@@ -394,16 +394,16 @@ document.addEventListener('DOMContentLoaded', () => {
         currentGuide.current_lang = langCode;
         languageSelector.value = langCode;
 
-        // Update guide title and summary from JSONB
-        const guideDetails = currentGuide.details[langCode] || currentGuide.details[currentGuide.default_lang];
-        currentGuide.title = guideDetails.title;
-        currentGuide.summary = guideDetails.summary;
+        // Update guide title and summary from JSONB, with fallbacks
+        const guideDetails = currentGuide.details?.[langCode] || currentGuide.details?.[currentGuide.default_lang] || {};
+        currentGuide.title = guideDetails.title || 'Untitled Guide';
+        currentGuide.summary = guideDetails.summary || '';
 
-        // Update each POI with the text for the selected language
+        // Update each POI with the text for the selected language, with fallbacks
         pois.forEach(poi => {
-            const poiTexts = poi.texts[langCode] || poi.texts[currentGuide.default_lang];
-            poi.name = poiTexts.title;
-            poi.description = poiTexts.description;
+            const poiTexts = poi.texts?.[langCode] || poi.texts?.[currentGuide.default_lang] || {};
+            poi.name = poiTexts.title || 'Untitled POI';
+            poi.description = poiTexts.description || '';
         });
 
         // Update utterance language for TTS
