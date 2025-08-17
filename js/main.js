@@ -315,17 +315,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchAndDisplayGuides() {
-        // This function will be expanded to handle the bug fix later
-        const { data: guides, error } = await supabase.from('guides').select('id, title, summary, slug').eq('status', 'published');
+        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+        let query = supabase.from('guides').select('slug, details, default_lang');
+
+        // Editors can see their own drafts, everyone can see published guides
+        if (isEditor && currentUser) {
+            query = query.or(`author_id.eq.${currentUser.id},status.eq.published`);
+        } else {
+            query = query.eq('status', 'published');
+        }
+
+        const { data: guides, error } = await query;
+
         if (error) {
-            guideCatalogList.innerHTML = '<p>Could not load guides.</p>';
+            console.error("Error fetching guides:", error);
+            guideCatalogList.innerHTML = `<p>Error loading guides.</p>`;
             return;
         }
+        if (!guides || guides.length === 0) {
+            guideCatalogList.innerHTML = '<p>No guides found.</p>';
+            return;
+        }
+
         guideCatalogList.innerHTML = '';
         guides.forEach(guide => {
             const card = document.createElement('div');
             card.className = 'card';
-            card.innerHTML = `<h5 class="card-title">${guide.title}</h5><p class="card-text">${guide.summary || ''}</p>`;
+
+            const lang = guide.default_lang || 'en';
+            const guideDetails = guide.details?.[lang] || { title: 'Untitled', summary: '' };
+            const title = guideDetails.title;
+            const summary = guideDetails.summary;
+
+            card.innerHTML = `<h5 class="card-title">${title}</h5><p class="card-text">${summary || ''}</p>`;
             card.addEventListener('click', () => loadGuide(guide.slug));
             guideCatalogList.appendChild(card);
         });
