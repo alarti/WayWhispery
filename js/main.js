@@ -724,6 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initializer
     // -----------------------------------------------------------------------------
     async function init() {
+        console.log("INIT started...");  
         const splashScreen = document.getElementById('splash-screen');
         const splashCloseBtn = document.getElementById('splash-close-btn');
 
