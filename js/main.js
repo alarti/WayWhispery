@@ -726,26 +726,35 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     async function init() {
         const splashScreen = document.getElementById('splash-screen');
+        const splashCloseBtn = document.getElementById('splash-close-btn');
 
-        initializeMap();
-        setupEventListeners();
+        const hideSplash = () => splashScreen.classList.add('hidden');
+        splashCloseBtn.addEventListener('click', hideSplash);
 
-        supabase.auth.onAuthStateChange(async (event, session) => {
+        try {
+            initializeMap();
+            setupEventListeners();
+
+            supabase.auth.onAuthStateChange(async (event, session) => {
+                currentUser = session?.user || null;
+                userProfile = currentUser ? await getProfile(currentUser.id) : null;
+                updateUIforAuth();
+            });
+
+            const { data: { session } } = await supabase.auth.getSession();
             currentUser = session?.user || null;
             userProfile = currentUser ? await getProfile(currentUser.id) : null;
             updateUIforAuth();
-        });
 
-        const { data: { session } } = await supabase.auth.getSession();
-        currentUser = session?.user || null;
-        userProfile = currentUser ? await getProfile(currentUser.id) : null;
-        updateUIforAuth();
-
-        await fetchAndDisplayGuides();
-        updateMapView(); // Initial update
-
-        // Hide splash screen once everything is ready
-        splashScreen.classList.add('hidden');
+            await fetchAndDisplayGuides();
+            updateMapView(); // Initial update
+        } catch (error) {
+            console.error("Error during initialization:", error);
+            alert("An error occurred while loading the application. Please try refreshing the page.");
+        } finally {
+            // Always hide splash screen after init, regardless of success or failure
+            setTimeout(hideSplash, 500); // Give a small delay for content to render
+        }
     }
 
     // Replace direct call with DOMContentLoaded
