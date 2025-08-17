@@ -342,8 +342,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'card';
 
+            let details_obj = guide.details;
+            if (typeof details_obj === 'string') {
+                try {
+                    details_obj = JSON.parse(details_obj);
+                } catch (e) {
+                    console.error('Error parsing guide details:', e);
+                    details_obj = {};
+                }
+            }
+
             const lang = guide.default_lang || 'en';
-            const guideDetails = guide.details?.[lang] || { title: 'Untitled', summary: '' };
+            const guideDetails = details_obj?.[lang] || { title: 'Untitled', summary: '' };
             const title = guideDetails.title;
             const summary = guideDetails.summary;
 
