@@ -1,7 +1,6 @@
 /*
  * WayWhispery - Redesigned Application
  * Author: Alberto Arce (Original)
- * Redesign: Jules
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -728,7 +727,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const splashScreen = document.getElementById('splash-screen');
         const splashCloseBtn = document.getElementById('splash-close-btn');
 
-        const hideSplash = () => splashScreen.classList.add('hidden');
+        const hideSplash = () => {
+            splashScreen.classList.add('hidden');
+            splashScreen.style.display = 'none'; // refuerzo
+        };
         if (splashCloseBtn) {
             splashCloseBtn.addEventListener('click', hideSplash);
         }
@@ -762,6 +764,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Replace direct call with DOMContentLoaded
     document.addEventListener('DOMContentLoaded', init);
 });
-// NOTE: This is a skeleton. The unchanged functions need to be filled in.
-// I'm overwriting the file to establish the new structure.
-// The next steps will be to fill in the unchanged function bodies.
+

@@ -1,14 +1,12 @@
 /* Author: Alberto Arce, Arcasoft */
-const CACHE_NAME = 'alhambra-guide-v1';
+const CACHE_NAME = 'waywispery-v1';
 const urlsToCache = [
     '/',
     '/index.html',
     '/css/style.css',
-    '/js/app.js',
-    '/assets/alhambra-map.svg',
+    '/js/main.js',
     '/manifest.json',
-    '/assets/icons/icon-192x192.png',
-    '/assets/icons/icon-512x512.png'
+    '/assets/icons/waywispery-icon.jpeg'
 ];
 
 self.addEventListener('install', event => {
