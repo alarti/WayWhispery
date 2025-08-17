@@ -724,11 +724,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Initializer
     // -----------------------------------------------------------------------------
-    async init() {
-        // Hide splash screen after a delay
-        setTimeout(() => {
-            document.getElementById('splash-screen').classList.add('hidden');
-        }, 2500);
+    async function init() {
+        const splashScreen = document.getElementById('splash-screen');
 
         initializeMap();
         setupEventListeners();
@@ -744,11 +741,15 @@ document.addEventListener('DOMContentLoaded', () => {
         userProfile = currentUser ? await getProfile(currentUser.id) : null;
         updateUIforAuth();
 
-        fetchAndDisplayGuides();
+        await fetchAndDisplayGuides();
         updateMapView(); // Initial update
+
+        // Hide splash screen once everything is ready
+        splashScreen.classList.add('hidden');
     }
 
-    init();
+    // Replace direct call with DOMContentLoaded
+    document.addEventListener('DOMContentLoaded', init);
 });
 // NOTE: This is a skeleton. The unchanged functions need to be filled in.
 // I'm overwriting the file to establish the new structure.
