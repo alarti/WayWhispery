@@ -79,12 +79,14 @@ html, body {
     display: flex;
     flex-direction: column;
     z-index: 1000;
-    transition: transform 0.3s ease-in-out;
-    transform: translateX(0); /* Initially visible */
+    transition: width 0.3s ease-in-out, padding 0.3s ease-in-out;
+    overflow: hidden;
+    flex-shrink: 0; /* Prevent sidebar from shrinking smaller than content */
 }
 
 .sidebar.collapsed {
-    transform: translateX(-100%);
+    width: 0;
+    border-right: none;
 }
 .sidebar-header {
     display: flex;
