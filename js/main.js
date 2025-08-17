@@ -409,7 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof guideDetailsObj === 'string') {
             try { guideDetailsObj = JSON.parse(guideDetailsObj); } catch (e) { guideDetailsObj = {}; }
         }
-        const guideDetails = guideDetailsObj?.[langCode] || guideDetailsObj?.[currentGuide.default_lang] || {};
+        const firstGuideLang = Object.keys(guideDetailsObj)[0];
+        const guideDetails = guideDetailsObj?.[langCode] || guideDetailsObj?.[currentGuide.default_lang] || guideDetailsObj?.[firstGuideLang] || {};
         currentGuide.title = guideDetails.title || 'Untitled Guide';
         currentGuide.summary = guideDetails.summary || '';
 
@@ -419,7 +420,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof poiTextsObj === 'string') {
                 try { poiTextsObj = JSON.parse(poiTextsObj); } catch (e) { poiTextsObj = {}; }
             }
-            const poiTexts = poiTextsObj?.[langCode] || poiTextsObj?.[currentGuide.default_lang] || {};
+            const firstPoiLang = Object.keys(poiTextsObj)[0];
+            const poiTexts = poiTextsObj?.[langCode] || poiTextsObj?.[currentGuide.default_lang] || poiTextsObj?.[firstPoiLang] || {};
             poi.name = poiTexts.title || 'Untitled POI';
             poi.description = poiTexts.description || '';
         });
