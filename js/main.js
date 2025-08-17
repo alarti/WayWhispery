@@ -423,11 +423,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         map.flyTo([poi.lat, poi.lon], 17); // Zoom in closer
 
-        // Open the popup on the corresponding marker
         const marker = poiMarkers[poi.id];
         if (marker) {
             marker.openPopup();
         }
+
+        // Trigger text and speech
+        const intros = introPhrases[currentGuide?.language || 'en'] || introPhrases.en;
+        const randomIntro = intros[Math.floor(Math.random() * intros.length)];
+        const fullDescription = `${randomIntro} ${poi.name}. ${poi.description}`;
+
+        updateGuideText(fullDescription);
+        speak(fullDescription);
+
+        // Mark as visited and update UI
+        visitedPois.add(poiId);
+        renderPoiList();
+        drawTourRoute();
     }
 
     function onMapClick(e) {
