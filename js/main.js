@@ -84,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userProfile = null;
     let isEditMode = false;
     let selectedLanguage = null;
+    let poisToDelete = [];
 
     // -----------------------------------------------------------------------------
     // Layout & UI Logic
@@ -97,6 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Modals
         formModalCloseBtn.onclick = () => hideFormModal();
+
+        // File import
+        document.getElementById('import-file-input').addEventListener('change', handleFileUpload);
 
         // Live Mode & TTS Controls
         liveModeToggle.addEventListener('change', () => {
@@ -517,21 +521,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isEditor || !currentGuide) return;
 
         if (isEditMode) {
+            // POI Edit Mode
             map.on('click', onMapClick);
             sidebarHeaderControls.innerHTML = `
-                <button id="save-guide-btn" class="btn-modern btn-modern-sm" title="Save Guide"><i class="fas fa-save"></i></button>
-                <button id="export-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export for Translation"><i class="fas fa-file-export"></i></button>
-                <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit Edit Mode"><i class="fas fa-times"></i></button>
+                <button id="save-guide-btn" class="btn-modern btn-modern-sm" title="Save Changes"><i class="fas fa-save"></i></button>
+                <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit POI Edit Mode"><i class="fas fa-times"></i></button>
+                <hr>
+                <button id="export-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export JSON"><i class="fas fa-file-export"></i></button>
+                <button id="import-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import JSON"><i class="fas fa-file-import"></i></button>
+                <button id="translate-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Auto-translate"><i class="fas fa-language"></i></button>
             `;
             sidebarHeaderControls.querySelector('#save-guide-btn').onclick = saveGuide;
             sidebarHeaderControls.querySelector('#export-guide-btn').onclick = exportForTranslation;
+            sidebarHeaderControls.querySelector('#import-guide-btn').onclick = () => document.getElementById('import-file-input').click();
+            sidebarHeaderControls.querySelector('#translate-guide-btn').onclick = showAutoTranslateModal;
             sidebarHeaderControls.querySelector('#exit-edit-btn').onclick = () => setMode('view');
         } else {
+            // View Mode with options for editors
             map.off('click', onMapClick);
             sidebarHeaderControls.innerHTML = `
-                <button id="edit-guide-btn" class="btn-modern btn-modern-sm" title="Edit Guide"><i class="fas fa-edit"></i></button>
+                <button id="edit-guide-details-btn" class="btn-modern btn-modern-sm" title="Edit Guide Details"><i class="fas fa-cog"></i></button>
+                <button id="edit-pois-btn" class="btn-modern btn-modern-sm" title="Edit POIs"><i class="fas fa-map-marker-alt"></i></button>
             `;
-            sidebarHeaderControls.querySelector('#edit-guide-btn').onclick = () => setMode('edit');
+            sidebarHeaderControls.querySelector('#edit-guide-details-btn').onclick = showGuideDetailsForm;
+            sidebarHeaderControls.querySelector('#edit-pois-btn').onclick = () => setMode('edit');
         }
         renderPois();
         renderPoiList();
@@ -625,22 +638,47 @@ document.addEventListener('DOMContentLoaded', () => {
     function editPoi(poiId) {
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
-        showFormModal('Edit POI', `
+
+        const lang = currentGuide.current_lang || currentGuide.default_lang;
+        const texts = poi.texts[lang] || { title: '', description: '' };
+
+        showFormModal(`Edit POI (in ${lang.toUpperCase()})`, `
             <form>
-                <div class="form-group"><label for="name">Name</label><input type="text" name="name" value="${poi.name}" required></div>
-                <div class="form-group"><label for="description">Description</label><textarea name="description" rows="3">${poi.description}</textarea></div>
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" name="name" value="${texts.title}" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea name="description" rows="3">${texts.description}</textarea>
+                </div>
                 <button type="submit" class="btn-modern">Save Changes</button>
             </form>`, (data) => {
+            // Ensure the texts object for the language exists
+            if (!poi.texts[lang]) {
+                poi.texts[lang] = {};
+            }
+            // Update the JSONB texts object for the specific language
+            poi.texts[lang].title = data.name;
+            poi.texts[lang].description = data.description;
+
+            // Also update the top-level properties for immediate UI refresh
             poi.name = data.name;
             poi.description = data.description;
-            renderPois();
+
+            // Re-render the list to show the new name
             renderPoiList();
+            // No need to re-render all POI markers on the map unless their position changes
             return true;
         });
     }
 
     function deletePoi(poiId) {
         if (!confirm('Are you sure?')) return;
+        // If the POI has a real ID (not a temp one), mark it for deletion.
+        if (!poiId.startsWith('temp-')) {
+            poisToDelete.push(poiId);
+        }
         pois = pois.filter(p => p.id !== poiId);
         tourRoute = tourRoute.filter(id => id !== poiId);
         renderPois();
@@ -651,13 +689,38 @@ document.addEventListener('DOMContentLoaded', () => {
     async function createNewGuide() {
         showFormModal('Create New Guide', `
             <form>
-                <div class="form-group"><label for="title">Title</label><input type="text" name="title" required></div>
-                <div class="form-group"><label for="slug">Slug</label><input type="text" name="slug" required pattern="[a-z0-9-]+"></div>
-                <div class="form-group"><label for="summary">Summary</label><textarea name="summary" rows="3"></textarea></div>
+                <div class="form-group"><label for="title">Title (in ${selectedLanguage.toUpperCase()})</label><input type="text" name="title" required></div>
+                <div class="form-group"><label for="slug">URL Slug</label><input type="text" name="slug" required pattern="[a-z0-9-]+" placeholder="e.g. my-cool-guide"></div>
+                <div class="form-group"><label for="summary">Summary (in ${selectedLanguage.toUpperCase()})</label><textarea name="summary" rows="3"></textarea></div>
                 <button type="submit" class="btn-modern">Create and Edit</button>
             </form>`, async (data) => {
-            const { data: guideData, error } = await supabase.from('guides').insert({ ...data, author_id: currentUser.id, status: 'draft', initial_lat: map.getCenter().lat, initial_lon: map.getCenter().lng, initial_zoom: map.getZoom() }).select().single();
-            if (error) { alert(`Error: ${error.message}`); return false; }
+            if (!selectedLanguage) {
+                alert("A language must be selected to create a guide.");
+                return false;
+            }
+
+            const newGuideData = {
+                slug: data.slug,
+                author_id: currentUser.id,
+                status: 'draft',
+                initial_lat: map.getCenter().lat,
+                initial_lon: map.getCenter().lng,
+                initial_zoom: map.getZoom(),
+                default_lang: selectedLanguage,
+                available_langs: [selectedLanguage],
+                details: {
+                    [selectedLanguage]: {
+                        title: data.title,
+                        summary: data.summary
+                    }
+                }
+            };
+
+            const { data: guideData, error } = await supabase.from('guides').insert(newGuideData).select().single();
+            if (error) {
+                alert(`Error creating guide: ${error.message}`);
+                return false;
+            }
             await loadGuide(guideData.slug);
             setMode('edit');
             return true;
@@ -665,16 +728,104 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveGuide() {
-        const sectionsToSave = pois.map((poi, index) => ({ guide_id: currentGuide.id, title: poi.name, body_md: poi.description, lat: poi.lat, lon: poi.lon, order: index, ...(poi.id.toString().startsWith('temp-') ? {} : { id: poi.id }) }));
-        const { error } = await supabase.from('guide_sections').upsert(sectionsToSave);
-        if (error) { alert(`Error saving: ${error.message}`); }
-        else { alert('Guide saved!'); await loadGuide(currentGuide.slug); }
+        // 1. Delete POIs that were marked for deletion
+        if (poisToDelete.length > 0) {
+            const { error: deleteError } = await supabase.from('guide_sections').delete().in('id', poisToDelete);
+            if (deleteError) {
+                alert(`Error deleting POIs: ${deleteError.message}`);
+                return; // Stop if deletion fails
+            }
+            poisToDelete = []; // Clear the array after successful deletion
+        }
+
+        // 2. Upsert (insert or update) the remaining POIs
+        const sectionsToSave = pois.map((poi, index) => {
+            // This needs to be adapted for the new multi-language structure
+            const poiData = {
+                guide_id: currentGuide.id,
+                texts: poi.texts, // Assuming poi.texts is the JSONB object
+                lat: poi.lat,
+                lon: poi.lon,
+                order: index
+            };
+            if (!poi.id.toString().startsWith('temp-')) {
+                poiData.id = poi.id;
+            }
+            return poiData;
+        });
+
+        const { error: upsertError } = await supabase.from('guide_sections').upsert(sectionsToSave);
+        if (upsertError) {
+            alert(`Error saving guide sections: ${upsertError.message}`);
+        } else {
+            alert('Guide saved successfully!');
+            await loadGuide(currentGuide.slug); // Reload to get fresh data
+        }
+    }
+
+    function showGuideDetailsForm() {
+        if (!currentGuide) return;
+        const lang = currentGuide.current_lang || currentGuide.default_lang;
+        const details = currentGuide.details[lang] || { title: '', summary: '' };
+
+        const formHTML = `
+            <form>
+                <div class="form-group">
+                    <label for="title">Title (in ${lang.toUpperCase()})</label>
+                    <input type="text" name="title" value="${details.title}" required>
+                </div>
+                <div class="form-group">
+                    <label for="summary">Summary (in ${lang.toUpperCase()})</label>
+                    <textarea name="summary" rows="4">${details.summary}</textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-modern">Save Details</button>
+                    <button type="button" id="delete-guide-btn" class="btn-modern btn-modern-danger">Delete Guide</button>
+                </div>
+            </form>
+        `;
+
+        showFormModal('Edit Guide Details', formHTML, async (data) => {
+            // Update logic
+            const newDetails = { ...currentGuide.details };
+            newDetails[lang] = { title: data.title, summary: data.summary };
+
+            const { error } = await supabase.from('guides')
+                .update({ details: newDetails })
+                .eq('id', currentGuide.id);
+
+            if (error) {
+                alert(`Error updating guide: ${error.message}`);
+                return false;
+            } else {
+                alert('Guide details saved!');
+                await loadGuide(currentGuide.slug); // Reload to see changes
+                return true;
+            }
+        });
+
+        // Add event listener for the delete button *after* the modal is shown
+        document.getElementById('delete-guide-btn').addEventListener('click', deleteGuide);
+    }
+
+    async function deleteGuide() {
+        if (!currentGuide) return;
+        if (!confirm(`Are you absolutely sure you want to delete the guide "${currentGuide.title}"? This action cannot be undone.`)) return;
+
+        const { error } = await supabase.from('guides').delete().eq('id', currentGuide.id);
+
+        if (error) {
+            alert(`Error deleting guide: ${error.message}`);
+        } else {
+            alert('Guide deleted successfully.');
+            window.location.reload(); // Reload the app to go back to the guide list
+        }
     }
 
     function exportForTranslation() {
         if (!currentGuide) return;
 
-        const langToExport = currentGuide.default_lang;
+        const langToExport = currentGuide.current_lang || currentGuide.default_lang;
         const translationTemplate = {
             guide: {
                 title: currentGuide.details[langToExport]?.title || '',
@@ -690,7 +841,133 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
 
-        downloadJson(translationTemplate, `${currentGuide.slug}-translations.json`);
+        downloadJson(translationTemplate, `${currentGuide.slug}-${langToExport}-translation.json`);
+    }
+
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const targetLang = prompt("Enter the 2-letter language code for this translation (e.g., 'es', 'fr'):");
+        if (!targetLang || targetLang.length !== 2) {
+            alert("Invalid language code.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                applyTranslation(importedData, targetLang.toLowerCase());
+            } catch (error) {
+                alert(`Error parsing JSON file: ${error.message}`);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; // Reset input
+    }
+
+    function showAutoTranslateModal() {
+        const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+        const availableLangs = new Set(currentGuide.available_langs);
+        let optionsHTML = '';
+        for (const [code, name] of Object.entries(langMap)) {
+            if (!availableLangs.has(code)) {
+                optionsHTML += `<option value="${code}">${name}</option>`;
+            }
+        }
+
+        if (!optionsHTML) {
+            alert("This guide has already been translated into all supported languages.");
+            return;
+        }
+
+        const formHTML = `
+            <p>Translate from <strong>${currentGuide.default_lang.toUpperCase()}</strong> to:</p>
+            <form>
+                <div class="form-group">
+                    <select name="targetLang" class="form-select">${optionsHTML}</select>
+                </div>
+                <button type="submit" class="btn-modern">Translate</button>
+            </form>
+            <p class="text-muted small">Note: Auto-translation is a tool. Please review results before saving.</p>
+        `;
+        showFormModal('Auto-translate Guide', formHTML, (data) => {
+            runAutoTranslation(data.targetLang);
+            return true;
+        });
+    }
+
+    async function runAutoTranslation(targetLang) {
+        if (!currentGuide) return;
+        const sourceLang = currentGuide.default_lang;
+        const translatedData = { guide: {}, pois: {} };
+        const textToTranslate = [];
+
+        // Gather all text
+        const guideDetails = currentGuide.details[sourceLang] || {};
+        textToTranslate.push(guideDetails.title || '');
+        textToTranslate.push(guideDetails.summary || '');
+        pois.forEach(poi => {
+            const poiTexts = poi.texts[sourceLang] || {};
+            textToTranslate.push(poiTexts.title || '');
+            textToTranslate.push(poiTexts.description || '');
+        });
+
+        // Show loader
+        showFormModal('Translating...', '<div class="loader"></div>', () => {});
+
+        try {
+            const translations = await Promise.all(textToTranslate.map(text =>
+                fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`)
+                .then(res => res.json())
+                .then(data => data.responseData.translatedText)
+            ));
+
+            // Reconstruct the data
+            translatedData.guide.title = translations.shift();
+            translatedData.guide.summary = translations.shift();
+            pois.forEach(poi => {
+                translatedData.pois[poi.id] = {
+                    title: translations.shift(),
+                    description: translations.shift()
+                };
+            });
+
+            applyTranslation(translatedData, targetLang);
+            hideFormModal(); // Hide loader
+            alert(`Translation to ${targetLang.toUpperCase()} complete. Please review the changes and save the guide.`);
+
+        } catch (error) {
+            hideFormModal();
+            alert(`Translation failed: ${error.message}`);
+        }
+    }
+
+    function applyTranslation(data, lang) {
+        // Update guide details
+        if (!currentGuide.details[lang]) currentGuide.details[lang] = {};
+        currentGuide.details[lang].title = data.guide.title;
+        currentGuide.details[lang].summary = data.guide.summary;
+
+        // Update POI texts
+        pois.forEach(poi => {
+            if (data.pois[poi.id]) {
+                if (!poi.texts[lang]) poi.texts[lang] = {};
+                poi.texts[lang].title = data.pois[poi.id].title;
+                poi.texts[lang].description = data.pois[poi.id].description;
+            }
+        });
+
+        // Add new language to available_langs
+        if (!currentGuide.available_langs.includes(lang)) {
+            currentGuide.available_langs.push(lang);
+        }
+
+        // Refresh UI
+        populateLanguageSelector();
+        switchLanguage(lang);
+        updateMapView();
     }
 
     function downloadJson(data, filename) {
