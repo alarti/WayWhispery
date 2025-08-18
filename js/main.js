@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUser = null;
     let userProfile = null;
     let isEditMode = false;
+    let selectedLanguage = null;
 
     // -----------------------------------------------------------------------------
     // Layout & UI Logic
@@ -355,8 +356,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchAndDisplayGuides() {
+        if (!selectedLanguage) {
+            guideCatalogList.innerHTML = '<p>Select a language from the splash screen to see available guides.</p>';
+            return;
+        }
+
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
-        let query = supabase.from('guides').select('slug, details, default_lang');
+        // Security Note: Supabase client library uses parameterized queries, preventing SQL injection.
+        // The RLS policies defined in the database provide row-level access control.
+        let query = supabase.from('guides')
+            .select('slug, details, default_lang, available_langs')
+            .contains('available_langs', `{${selectedLanguage}}`); // Filter by selected language
 
         // Editors can see their own drafts, everyone can see published guides
         if (isEditor && currentUser) {
@@ -373,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (!guides || guides.length === 0) {
-            guideCatalogList.innerHTML = '<p>No guides found.</p>';
+            guideCatalogList.innerHTML = `<p>No guides found for the selected language.</p>`;
             return;
         }
 
@@ -392,9 +402,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            const lang = guide.default_lang || 'en';
-            const firstAvailableLang = Object.keys(details_obj || {})[0];
-            const guideDetails = details_obj?.[lang] || details_obj?.[firstAvailableLang] || { title: 'Untitled', summary: '' };
+            // Use the selected language for display, fallback to default, then first available
+            const guideDetails = details_obj?.[selectedLanguage] || details_obj?.[guide.default_lang] || details_obj?.[Object.keys(details_obj || {})[0]] || { title: 'Untitled', summary: '' };
 
             const title = guideDetails.title;
             const summary = guideDetails.summary;
@@ -724,41 +733,55 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initializer
     // -----------------------------------------------------------------------------
     async function init() {
-        console.log("INIT started...");  
         const splashScreen = document.getElementById('splash-screen');
-        const splashCloseBtn = document.getElementById('splash-close-btn');
+        const splashLoader = document.getElementById('splash-loader');
+        const languageFlags = document.querySelectorAll('.flag-icon');
+        const splashLoginBtn = document.getElementById('splash-login-btn');
 
-        const hideSplash = () => {
-            splashScreen.classList.add('hidden');
-            splashScreen.style.display = 'none'; // refuerzo
-        };
-        if (splashCloseBtn) {
-            splashCloseBtn.addEventListener('click', hideSplash);
-        }
+        const startApp = async (lang) => {
+            selectedLanguage = lang;
+            splashLoader.classList.remove('hidden');
 
-        try {
-            initializeMap();
-            setupEventListeners();
+            try {
+                initializeMap();
+                setupEventListeners();
 
-            supabase.auth.onAuthStateChange(async (event, session) => {
+                // Set up auth listeners first
+                supabase.auth.onAuthStateChange(async (event, session) => {
+                    currentUser = session?.user || null;
+                    userProfile = currentUser ? await getProfile(currentUser.id) : null;
+                    updateUIforAuth();
+                });
+
+                // Get initial session
+                const { data: { session } } = await supabase.auth.getSession();
                 currentUser = session?.user || null;
                 userProfile = currentUser ? await getProfile(currentUser.id) : null;
                 updateUIforAuth();
+
+                // Fetch content
+                await fetchAndDisplayGuides();
+                updateMapView();
+
+                // Hide splash screen after loading is complete
+                splashScreen.classList.add('hidden');
+
+            } catch (error) {
+                console.error("Error during initialization:", error);
+                alert("An error occurred while loading the application. Please try refreshing the page.");
+                splashLoader.classList.add('hidden'); // Hide loader on error
+            }
+        };
+
+        languageFlags.forEach(flag => {
+            flag.addEventListener('click', () => {
+                const lang = flag.dataset.lang;
+                startApp(lang);
             });
+        });
 
-            const { data: { session } } = await supabase.auth.getSession();
-            currentUser = session?.user || null;
-            userProfile = currentUser ? await getProfile(currentUser.id) : null;
-            updateUIforAuth();
-
-            await fetchAndDisplayGuides();
-            updateMapView(); // Initial update
-        } catch (error) {
-            console.error("Error during initialization:", error);
-            alert("An error occurred while loading the application. Please try refreshing the page.");
-        } finally {
-            // Always hide splash screen after init, regardless of success or failure
-            setTimeout(hideSplash, 500); // Give a small delay for content to render
+        if (splashLoginBtn) {
+            splashLoginBtn.addEventListener('click', loginWithGoogle);
         }
     }
 

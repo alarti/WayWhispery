@@ -324,6 +324,51 @@ html, body {
     100% { transform: rotate(360deg); }
 }
 
+.loader.hidden {
+    display: none;
+}
+
+/* New Splash Screen Styles */
+#language-selector-container {
+    margin: 1.5rem 0;
+}
+.flags-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+.flag-icon {
+    width: 40px;
+    height: auto;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid transparent;
+}
+.flag-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+.splash-footer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ww-border-color);
+}
+.bmac-button img {
+    height: 40px;
+    width: auto;
+    border-radius: 8px;
+    transition: transform 0.2s;
+}
+.bmac-button:hover img {
+    transform: scale(1.05);
+}
+
 /* --- Map Overlays --- */
 #guide-text-overlay {
     position: absolute;
