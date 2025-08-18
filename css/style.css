@@ -408,3 +408,42 @@ html, body {
     align-items: center;
     justify-content: center;
 }
+
+/* User Profile Display */
+.user-profile-container {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between email and button */
+}
+
+.user-profile-container .user-email {
+    font-size: 0.9rem;
+    color: #f0f0f0; /* Light color to match other UI elements */
+    white-space: nowrap; /* Prevent wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Add ... if name is too long */
+    max-width: 150px; /* Adjust as needed */
+}
+
+/* Specific styling for the splash screen version */
+.splash-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.splash-auth-container {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.splash-footer .user-profile-container {
+    justify-content: center; /* Center items in the splash footer */
+}
+
+.splash-footer .user-email {
+    color: #333; /* Darker text for the light splash background */
+    max-width: 200px;
+}

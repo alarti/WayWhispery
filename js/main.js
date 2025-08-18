@@ -157,13 +157,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUIforAuth() {
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
         if (currentUser) {
-            authContainer.innerHTML = `<button id="logout-btn" class="activity-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></button>`;
+            authContainer.innerHTML = `
+                <div class="user-profile-container">
+                    <span class="user-email">${currentUser.email}</span>
+                    <button id="logout-btn" class="activity-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
+                </div>`;
             authContainer.querySelector('#logout-btn').addEventListener('click', logout);
         } else {
             authContainer.innerHTML = `<button id="login-btn" class="activity-btn" title="Login"><i class="fas fa-sign-in-alt"></i></button>`;
             authContainer.querySelector('#login-btn').addEventListener('click', loginWithGoogle);
         }
         updateHeaderControls();
+    }
+
+    function updateSplashAuthUI() {
+        const splashFooter = document.querySelector('.splash-footer');
+        if (currentUser && splashFooter) {
+            const authContainer = splashFooter.querySelector('.splash-auth-container');
+            if (authContainer) {
+                authContainer.innerHTML = `
+                    <div class="user-profile-container">
+                        <span class="user-email">${currentUser.email}</span>
+                        <button id="splash-logout-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>`;
+                splashFooter.querySelector('#splash-logout-btn').addEventListener('click', logout);
+            }
+        }
     }
 
     function updateMapView() {
@@ -1035,6 +1054,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentUser = session?.user || null;
                 userProfile = currentUser ? await getProfile(currentUser.id) : null;
                 updateUIforAuth();
+                updateSplashAuthUI();
 
                 // Fetch content
                 await fetchAndDisplayGuides();
