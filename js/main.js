@@ -1010,13 +1010,15 @@ document.addEventListener('DOMContentLoaded', () => {
         formModalContent.innerHTML = formHTML;
         formModal.classList.remove('hidden');
         const form = formModalContent.querySelector('form');
-        function handleSubmit(e) {
-            e.preventDefault();
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-            if (submitCallback(data)) { hideFormModal(); }
+        if (form) {
+            function handleSubmit(e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                if (submitCallback(data)) { hideFormModal(); }
+            }
+            form.addEventListener('submit', handleSubmit);
         }
-        form.addEventListener('submit', handleSubmit);
         formModalCloseBtn.onclick = () => hideFormModal();
     }
 
