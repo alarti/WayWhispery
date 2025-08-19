@@ -740,6 +740,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`Error creating guide: ${error.message}`);
                 return false;
             }
+            if (!guideData) {
+                alert("Failed to create guide. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                return false;
+            }
             await loadGuide(guideData.slug);
             setMode('edit');
             return true;
@@ -773,13 +777,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return poiData;
         });
 
-        const { error: upsertError } = await supabase.from('guide_sections').upsert(sectionsToSave);
-        if (upsertError) {
-            alert(`Error saving guide sections: ${upsertError.message}`);
-        } else {
-            alert('Guide saved successfully!');
-            await loadGuide(currentGuide.slug); // Reload to get fresh data
+        // 2. Upsert (insert or update) the remaining POIs
+        if (sectionsToSave.length > 0) {
+            const { data: upsertData, error: upsertError } = await supabase.from('guide_sections').upsert(sectionsToSave).select();
+            if (upsertError) {
+                alert(`Error saving guide sections: ${upsertError.message}`);
+                return;
+            }
+            if (!upsertData || upsertData.length === 0) {
+                alert("Failed to save POIs. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                return;
+            }
         }
+
+        alert('Guide saved successfully!');
+        await loadGuide(currentGuide.slug); // Reload to get fresh data
     }
 
     function showGuideDetailsForm() {
@@ -809,18 +821,23 @@ document.addEventListener('DOMContentLoaded', () => {
             const newDetails = { ...currentGuide.details };
             newDetails[lang] = { title: data.title, summary: data.summary };
 
-            const { error } = await supabase.from('guides')
+            const { data, error } = await supabase.from('guides')
                 .update({ details: newDetails })
-                .eq('id', currentGuide.id);
+                .eq('id', currentGuide.id)
+                .select();
 
             if (error) {
                 alert(`Error updating guide: ${error.message}`);
                 return false;
-            } else {
-                alert('Guide details saved!');
-                await loadGuide(currentGuide.slug); // Reload to see changes
-                return true;
             }
+            if (!data || data.length === 0) {
+                alert("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                return false;
+            }
+
+            alert('Guide details saved!');
+            await loadGuide(currentGuide.slug); // Reload to see changes
+            return true;
         });
 
         // Add event listener for the delete button *after* the modal is shown
