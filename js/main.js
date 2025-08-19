@@ -18,7 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Layout
     const activityMapBtn = document.getElementById('activity-map-btn');
-    const sidebarLogo = document.getElementById('sidebar-logo');
+    const logoBtn = document.getElementById('logo-btn');
+    const langBtn = document.getElementById('lang-btn');
     const sidebarViewTitle = document.getElementById('sidebar-view-title');
     const sidebarHeaderControls = document.getElementById('sidebar-header-controls');
     const sidebarGuidesView = document.getElementById('sidebar-guides-view');
@@ -92,11 +93,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupEventListeners() {
         // Main layout
-        sidebarLogo.addEventListener('click', () => switchSidebarView('guides'));
+        logoBtn.addEventListener('click', () => switchSidebarView('guides'));
         activityMapBtn.addEventListener('click', () => switchSidebarView('map'));
+        langBtn.addEventListener('click', () => {
+            document.getElementById('splash-screen').classList.remove('hidden');
+        });
 
         // Modals
         formModalCloseBtn.onclick = () => hideFormModal();
+
+        // Close user menus if clicking outside
+        window.addEventListener('click', (event) => {
+            if (!event.target.closest('.user-menu-container')) {
+                document.querySelectorAll('.user-menu.visible').forEach(menu => menu.classList.remove('visible'));
+            }
+        });
 
         document.getElementById('import-guides-input').addEventListener('change', (event) => {
             const file = event.target.files[0];
@@ -138,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function switchSidebarView(viewName) {
         const sidebar = document.querySelector('.sidebar');
-        const newActiveBtn = viewName === 'map' ? activityMapBtn : sidebarLogo;
+        const newActiveBtn = viewName === 'map' ? activityMapBtn : logoBtn;
         const isAlreadyActive = newActiveBtn.classList.contains('active');
 
         // If the clicked button's view is already active, just toggle visibility
@@ -148,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         activityMapBtn.classList.remove('active');
-        sidebarLogo.classList.remove('active');
+        logoBtn.classList.remove('active');
         newActiveBtn.classList.add('active');
 
         if (viewName === 'guides') {
@@ -166,14 +177,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateUIforAuth() {
-        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
         if (currentUser) {
             authContainer.innerHTML = `
-                <div class="user-profile-container">
-                    <span class="user-email">${currentUser.email}</span>
-                    <button id="logout-btn" class="activity-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
+                <div class="user-menu-container">
+                    <button class="activity-btn" id="user-menu-btn" title="User Menu"><i class="fas fa-user-circle"></i></button>
+                    <div class="user-menu" id="main-user-menu">
+                        <div class="user-email">${currentUser.email}</div>
+                        <button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>
                 </div>`;
-            authContainer.querySelector('#logout-btn').addEventListener('click', logout);
+
+            authContainer.querySelector('#user-menu-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('main-user-menu').classList.toggle('visible');
+            });
+            authContainer.querySelector('.logout-btn').addEventListener('click', logout);
+
         } else {
             authContainer.innerHTML = `<button id="login-btn" class="activity-btn" title="Login"><i class="fas fa-sign-in-alt"></i></button>`;
             authContainer.querySelector('#login-btn').addEventListener('click', loginWithGoogle);
@@ -183,16 +202,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateSplashAuthUI() {
         const splashFooter = document.querySelector('.splash-footer');
-        if (currentUser && splashFooter) {
-            const authContainer = splashFooter.querySelector('.splash-auth-container');
-            if (authContainer) {
-                authContainer.innerHTML = `
-                    <div class="user-profile-container">
-                        <span class="user-email">${currentUser.email}</span>
-                        <button id="splash-logout-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-sign-out-alt"></i> Logout</button>
-                    </div>`;
-                splashFooter.querySelector('#splash-logout-btn').addEventListener('click', logout);
-            }
+        const authContainer = splashFooter?.querySelector('.splash-auth-container');
+        if (!authContainer) return;
+
+        if (currentUser) {
+            authContainer.innerHTML = `
+                <div class="user-menu-container">
+                    <button class="btn-modern btn-modern-secondary" id="splash-user-menu-btn" title="User Menu"><i class="fas fa-user-circle"></i></button>
+                    <div class="user-menu" id="splash-user-menu">
+                        <div class="user-email">${currentUser.email}</div>
+                        <button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>
+                </div>`;
+
+            authContainer.querySelector('#splash-user-menu-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('splash-user-menu').classList.toggle('visible');
+            });
+            authContainer.querySelector('.logout-btn').addEventListener('click', logout);
+        } else {
+            // This part is redundant as the default HTML is the login button, but good for clarity on re-renders
+            authContainer.innerHTML = `<button id="splash-login-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-sign-in-alt"></i> Login</button>`;
+            const loginBtn = document.getElementById('splash-login-btn');
+            if(loginBtn) loginBtn.addEventListener('click', loginWithGoogle);
         }
     }
 
@@ -1171,8 +1203,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const languageFlags = document.querySelectorAll('.flag-icon');
         const splashLoginBtn = document.getElementById('splash-login-btn');
 
+        function updateLangButton(lang) {
+            langBtn.innerHTML = `<img src="https://flagcdn.com/w20/${lang}.png" alt="${lang}">`;
+        }
+
         const startApp = async (lang) => {
             selectedLanguage = lang;
+            updateLangButton(lang);
             splashLoader.classList.remove('hidden');
 
             try {
