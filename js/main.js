@@ -821,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const newDetails = { ...currentGuide.details };
             newDetails[lang] = { title: data.title, summary: data.summary };
 
-            const { data, error } = await supabase.from('guides')
+            const { data: responseData, error } = await supabase.from('guides')
                 .update({ details: newDetails })
                 .eq('id', currentGuide.id)
                 .select();
@@ -830,7 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`Error updating guide: ${error.message}`);
                 return false;
             }
-            if (!data || data.length === 0) {
+            if (!responseData || responseData.length === 0) {
                 alert("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
                 return false;
             }
