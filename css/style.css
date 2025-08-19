@@ -504,3 +504,10 @@ html, body {
     left: 50%;
     transform: translateX(-50%);
 }
+
+#activity-bar-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    object-fit: cover;
+}
