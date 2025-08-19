@@ -3,6 +3,7 @@
  * Author: Alberto Arce (Original)
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import Client from 'https://g4f.dev/dist/js/client.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -12,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const SUPABASE_URL = 'https://whfcesalellvnrbdcsbb.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndoZmNlc2FsZWxsdm5yYmRjc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNTY0NDMsImV4cCI6MjA3MDkzMjQ0M30.wjzU9y1pudSctnLxaIIAfG8FKbMalLbKU4rto99vP9E';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const g4fClient = new Client();
 
     // -----------------------------------------------------------------------------
     // DOM Elements
@@ -544,10 +546,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentView === 'guides') {
             sidebarHeaderControls.innerHTML = `
+                <button id="generate-guide-btn" class="btn-modern btn-modern-sm btn-modern-primary" title="Generate Guide with AI"><i class="fas fa-magic"></i></button>
                 <button id="import-guides-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import Guides"><i class="fas fa-file-import"></i></button>
                 <button id="export-all-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export All Guides"><i class="fas fa-file-export"></i></button>
                 <button id="create-guide-btn" class="btn-modern btn-modern-sm" title="New Guide"><i class="fas fa-plus"></i> New</button>
             `;
+            sidebarHeaderControls.querySelector('#generate-guide-btn').onclick = showGenerateGuideModal;
             sidebarHeaderControls.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
             sidebarHeaderControls.querySelector('#export-all-btn').onclick = exportAllGuides;
             sidebarHeaderControls.querySelector('#create-guide-btn').onclick = createNewGuide;
@@ -991,6 +995,78 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             hideFormModal();
             alert(`Failed to export guides: ${error.message}`);
+        }
+    }
+
+    function showGenerateGuideModal() {
+        const formHTML = `
+            <form>
+                <div class="form-group">
+                    <label for="topic">What topic would you like to generate a guide for?</label>
+                    <input type="text" name="topic" placeholder="e.g., A walking tour of the Roman Forum" required>
+                </div>
+                <p class="text-muted small">The AI will generate a title, summary, and a list of 10-15 POIs with coordinates. This may take a moment.</p>
+                <button type="submit" class="btn-modern">Generate Guide</button>
+            </form>
+        `;
+        showFormModal('Generate Guide with AI', formHTML, (data) => {
+            runGuideGeneration(data.topic);
+            return true;
+        });
+    }
+
+    async function runGuideGeneration(topic) {
+        showFormModal('Generating Guide...', '<div class="loader"></div>', () => {});
+
+        const prompt = `
+            You are an expert tour guide creator. Your task is to generate a complete tour guide on a given topic.
+            The output must be a single, valid JSON object and nothing else. Do not include any text, explanation, or markdown fences before or after the JSON object.
+
+            The topic is: "${topic}".
+
+            The JSON object must follow this exact structure:
+            {
+              "guides": [
+                {
+                  "slug": "a-unique-slug-for-the-guide-in-english",
+                  "default_lang": "en",
+                  "status": "draft",
+                  "details": { "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." } },
+                  "pois": [
+                    { "order": 1, "texts": { "en": { "title": "POI 1 Title", "description": "POI 1 Description." } }, "lat": 41.8925, "lon": 12.4853 },
+                    { "order": 2, "texts": { "en": { "title": "POI 2 Title", "description": "POI 2 Description." } }, "lat": 41.8922, "lon": 12.4858 }
+                  ]
+                }
+              ]
+            }
+
+            Please generate a guide with 10 to 15 POIs. The POIs should be in a logical walking order.
+            You MUST invent plausible latitude and longitude coordinates for each POI, centered around the main topic location.
+            The slug should be a URL-friendly version of the English title. The language for all text content must be English.
+        `;
+
+        try {
+            const result = await g4fClient.chat.completions.create({
+                model: 'gpt-4.1', // A capable model is needed for this task
+                messages: [{ role: 'user', content: prompt }]
+            });
+
+            let jsonResponse = result.choices[0].message.content;
+
+            // Clean the response to ensure it's just a JSON object
+            const jsonMatch = jsonResponse.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error("AI did not return a valid JSON object.");
+            }
+            jsonResponse = jsonMatch[0];
+
+            // The importGuides function will handle the rest (parsing, importing, reloading)
+            await importGuides(jsonResponse);
+
+        } catch (error) {
+            hideFormModal();
+            alert(`AI guide generation failed: ${error.message}`);
+            console.error(error);
         }
     }
 
