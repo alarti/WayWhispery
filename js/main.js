@@ -830,6 +830,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label for="summary">Summary (in ${lang.toUpperCase()})</label>
                     <textarea name="summary" rows="4">${details.summary}</textarea>
                 </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="draft" ${currentGuide.status === 'draft' ? 'selected' : ''}>Draft</option>
+                        <option value="published" ${currentGuide.status === 'published' ? 'selected' : ''}>Published</option>
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="submit" class="btn-modern">Save Details</button>
                     <button type="button" id="delete-guide-btn" class="btn-modern btn-modern-danger">Delete Guide</button>
@@ -843,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
             newDetails[lang] = { title: data.title, summary: data.summary };
 
             const { data: responseData, error } = await supabase.from('guides')
-                .update({ details: newDetails })
+                .update({ details: newDetails, status: data.status })
                 .eq('id', currentGuide.id)
                 .select();
 
