@@ -34,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const guideMetaContainer = document.getElementById('guide-meta-container');
     const authorNameSpan = document.getElementById('author-name');
     const poiList = document.getElementById('poi-list');
-    const languageSelector = document.getElementById('language-selector');
 
     // Map Overlays & Controls
     const guideTextOverlay = document.getElementById('guide-text-overlay');
@@ -98,6 +97,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Modals
         formModalCloseBtn.onclick = () => hideFormModal();
+
+        document.getElementById('import-guides-input').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    importGuides(e.target.result);
+                } catch (error) {
+                    alert(`Error parsing JSON file: ${error.message}`);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        });
 
         // Live Mode & TTS Controls
         liveModeToggle.addEventListener('change', () => {
@@ -440,63 +454,34 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`Error loading guide: ${error?.message || 'Guide not found.'}`);
             return;
         }
-        const { data: sectionsData, error: sectionsError } = await supabase.from('guide_sections').select('*').eq('guide_id', guideData.id).order('order');
+        const { data: sectionsData, error: sectionsError } = await supabase.from('guide_poi').select('*').eq('guide_id', guideData.id).order('order');
         if (sectionsError) {
-            alert(`Error loading guide sections: ${sectionsError.message}`);
+            alert(`Error loading guide POIs: ${sectionsError.message}`);
             return;
         }
         currentGuide = guideData;
-        // The raw POI data now contains the JSONB 'texts' field
         pois = sectionsData;
         tourRoute = pois.map(p => p.id);
 
-        populateLanguageSelector();
-        switchLanguage(currentGuide.default_lang); // Switch to default language
+        // Process guide texts for the guide's default language
+        const langCode = currentGuide.default_lang;
+        currentGuide.current_lang = langCode; // Set current lang for consistency
 
-        map.setView([currentGuide.initial_lat, currentGuide.initial_lon], currentGuide.initial_zoom);
-        updateMapView();
-        switchSidebarView('map');
-
-        if (isMobile()) {
-            document.querySelector('.sidebar').classList.remove('active');
-        }
-    }
-
-    function populateLanguageSelector() {
-        languageSelector.innerHTML = '';
-        const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
-        currentGuide.available_langs.forEach(langCode => {
-            const option = document.createElement('option');
-            option.value = langCode;
-            option.textContent = langMap[langCode] || langCode;
-            languageSelector.appendChild(option);
-        });
-        languageSelector.addEventListener('change', (e) => switchLanguage(e.target.value));
-    }
-
-    function switchLanguage(langCode) {
-        // Update the current language state
-        currentGuide.current_lang = langCode;
-        languageSelector.value = langCode;
-
-        // Safely parse guide details
         let guideDetailsObj = currentGuide.details;
         if (typeof guideDetailsObj === 'string') {
             try { guideDetailsObj = JSON.parse(guideDetailsObj); } catch (e) { guideDetailsObj = {}; }
         }
-        const firstGuideLang = Object.keys(guideDetailsObj)[0];
-        const guideDetails = guideDetailsObj?.[langCode] || guideDetailsObj?.[currentGuide.default_lang] || guideDetailsObj?.[firstGuideLang] || {};
+        const guideDetails = guideDetailsObj?.[langCode] || {};
         currentGuide.title = guideDetails.title || 'Untitled Guide';
         currentGuide.summary = guideDetails.summary || '';
 
-        // Safely parse POI texts
+        // Process POI texts for the guide's default language
         pois.forEach(poi => {
             let poiTextsObj = poi.texts;
             if (typeof poiTextsObj === 'string') {
                 try { poiTextsObj = JSON.parse(poiTextsObj); } catch (e) { poiTextsObj = {}; }
             }
-            const firstPoiLang = Object.keys(poiTextsObj)[0];
-            const poiTexts = poiTextsObj?.[langCode] || poiTextsObj?.[currentGuide.default_lang] || poiTextsObj?.[firstPoiLang] || {};
+            const poiTexts = poiTextsObj?.[langCode] || {};
             poi.name = poiTexts.title || 'Untitled POI';
             poi.description = poiTexts.description || '';
         });
@@ -505,8 +490,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const ttsLangMap = { en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN' };
         utterance.lang = ttsLangMap[langCode] || 'en-US';
 
-        // Re-render the UI
+        map.setView([currentGuide.initial_lat, currentGuide.initial_lon], currentGuide.initial_zoom);
         updateMapView();
+        switchSidebarView('map');
+
+        if (isMobile()) {
+            document.querySelector('.sidebar').classList.remove('active');
+        }
     }
 
     // -----------------------------------------------------------------------------
@@ -520,11 +510,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentView = sidebarGuidesView.classList.contains('active') ? 'guides' : 'map';
 
         if (currentView === 'guides') {
-            const createBtn = document.createElement('button');
-            createBtn.className = 'btn-modern btn-modern-sm';
-            createBtn.innerHTML = '<i class="fas fa-plus"></i> New';
-            createBtn.onclick = createNewGuide;
-            sidebarHeaderControls.appendChild(createBtn);
+            sidebarHeaderControls.innerHTML = `
+                <button id="import-guides-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import Guides"><i class="fas fa-file-import"></i></button>
+                <button id="export-all-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export All Guides"><i class="fas fa-file-export"></i></button>
+                <button id="create-guide-btn" class="btn-modern btn-modern-sm" title="New Guide"><i class="fas fa-plus"></i> New</button>
+            `;
+            sidebarHeaderControls.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
+            sidebarHeaderControls.querySelector('#export-all-btn').onclick = exportAllGuides;
+            sidebarHeaderControls.querySelector('#create-guide-btn').onclick = createNewGuide;
         } else if (currentView === 'map' && currentGuide) {
             setMode(isEditMode ? 'edit' : 'view'); // Re-render controls for map view
         }
@@ -748,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function saveGuide() {
         // 1. Delete POIs that were marked for deletion
         if (poisToDelete.length > 0) {
-            const { error: deleteError } = await supabase.from('guide_sections').delete().in('id', poisToDelete);
+            const { error: deleteError } = await supabase.from('guide_poi').delete().in('id', poisToDelete);
             if (deleteError) {
                 alert(`Error deleting POIs: ${deleteError.message}`);
                 return; // Stop if deletion fails
@@ -774,9 +767,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 2. Upsert (insert or update) the remaining POIs
         if (sectionsToSave.length > 0) {
-            const { data: upsertData, error: upsertError } = await supabase.from('guide_sections').upsert(sectionsToSave).select();
+            const { data: upsertData, error: upsertError } = await supabase.from('guide_poi').upsert(sectionsToSave).select();
             if (upsertError) {
-                alert(`Error saving guide sections: ${upsertError.message}`);
+                alert(`Error saving POIs: ${upsertError.message}`);
                 return;
             }
             if (!upsertData || upsertData.length === 0) {
@@ -873,6 +866,92 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         downloadJson(translationTemplate, `${currentGuide.slug}-${langToExport}-translation.json`);
+    }
+
+    async function importGuides(json) {
+        let parsedData;
+        try {
+            parsedData = JSON.parse(json);
+            if (!parsedData.guides || !Array.isArray(parsedData.guides)) {
+                throw new Error("Invalid JSON format: 'guides' array not found.");
+            }
+        } catch (error) {
+            alert(`Error reading file: ${error.message}`);
+            return;
+        }
+
+        showFormModal('Importing...', '<div class="loader"></div>', () => {});
+
+        try {
+            for (const guide of parsedData.guides) {
+                const { pois, ...guideData } = guide;
+                delete guideData.id; // Let DB handle the ID
+
+                // 1. Upsert the guide itself, using slug as the conflict target
+                const { data: upsertedGuide, error: guideError } = await supabase
+                    .from('guides')
+                    .upsert(guideData, { onConflict: 'slug' })
+                    .select('id')
+                    .single();
+
+                if (guideError || !upsertedGuide) throw new Error(`Failed to import guide "${guideData.slug}": ${guideError?.message}`);
+
+                const guideId = upsertedGuide.id;
+
+                // 2. Clear all old POIs for this guide to ensure a clean import
+                const { error: deleteError } = await supabase.from('guide_poi').delete().eq('guide_id', guideId);
+                if (deleteError) throw new Error(`Failed to clear old POIs for guide "${guideData.slug}": ${deleteError.message}`);
+
+                // 3. Insert the new POIs
+                if (pois && pois.length > 0) {
+                    const newPois = pois.map(p => {
+                        delete p.id; // Let DB handle the ID
+                        p.guide_id = guideId; // Assign the correct new guide ID
+                        return p;
+                    });
+                    const { error: poiError } = await supabase.from('guide_poi').insert(newPois);
+                    if (poiError) throw new Error(`Failed to import POIs for guide "${guideData.slug}": ${poiError.message}`);
+                }
+            }
+
+            hideFormModal();
+            alert('Import complete! Reloading to see changes.');
+            window.location.reload();
+
+        } catch (error) {
+            hideFormModal();
+            alert(`An error occurred during import: ${error.message}`);
+        }
+    }
+
+    async function exportAllGuides() {
+        showFormModal('Exporting...', '<div class="loader"></div>', () => {});
+        try {
+            const { data: guides, error: guidesError } = await supabase.from('guides').select('*');
+            if (guidesError) throw guidesError;
+
+            const { data: pois, error: poisError } = await supabase.from('guide_poi').select('*');
+            if (poisError) throw poisError;
+
+            const poisByGuideId = {};
+            pois.forEach(p => {
+                if (!poisByGuideId[p.guide_id]) {
+                    poisByGuideId[p.guide_id] = [];
+                }
+                poisByGuideId[p.guide_id].push(p);
+            });
+
+            const exportData = guides.map(g => ({
+                ...g,
+                pois: poisByGuideId[g.id] || []
+            }));
+
+            downloadJson({ guides: exportData }, 'waywhispery-backup.json');
+            hideFormModal();
+        } catch (error) {
+            hideFormModal();
+            alert(`Failed to export guides: ${error.message}`);
+        }
     }
 
 
@@ -1028,7 +1107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             // 3. Bulk insert the new POIs
-            const { error: sectionsError } = await supabase.from('guide_sections').insert(newSections);
+            const { error: sectionsError } = await supabase.from('guide_poi').insert(newSections);
 
             if (sectionsError) {
                 // Note: This could leave an orphaned guide. A more robust solution might use a transaction or delete the guide.

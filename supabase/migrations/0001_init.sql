@@ -39,10 +39,10 @@ CREATE TABLE guides (
 
 
 -- -----------------------------------------------------------------------------
--- Tabla: guide_sections
--- Almacena las secciones de contenido de una guía, en orden. (También son los POIs)
+-- Tabla: guide_poi
+-- Almacena los Puntos de Interés (POIs) de una guía, en orden.
 -- -----------------------------------------------------------------------------
-CREATE TABLE guide_sections (
+CREATE TABLE guide_poi (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     guide_id uuid REFERENCES guides(id) ON DELETE CASCADE NOT NULL,
     "order" INTEGER DEFAULT 0,
@@ -88,7 +88,7 @@ CREATE TABLE media (
 -- -----------------------------------------------------------------------------
 CREATE INDEX ON guides(slug);
 CREATE INDEX ON guides(status, language, updated_at);
-CREATE INDEX ON guide_sections(guide_id, "order");
+CREATE INDEX ON guide_poi(guide_id, "order");
 CREATE INDEX ON tags(slug);
 
 -- -----------------------------------------------------------------------------
@@ -96,7 +96,7 @@ CREATE INDEX ON tags(slug);
 -- -----------------------------------------------------------------------------
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guides ENABLE ROW LEVEL SECURITY;
-ALTER TABLE guide_sections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE guide_poi ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE guide_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media ENABLE ROW LEVEL SECURITY;
@@ -148,16 +148,16 @@ FOR DELETE USING (auth.uid() = author_id OR get_user_role() IN ('editor', 'admin
 
 
 -- -----------------------------------------------------------------------------
--- Políticas de RLS para `guide_sections`, `tags`, `guide_tags`, `media`
+-- Políticas de RLS para `guide_poi`, `tags`, `guide_tags`, `media`
 -- -----------------------------------------------------------------------------
 
--- guide_sections
-CREATE POLICY "Allow public read on sections of published guides" ON guide_sections
+-- guide_poi
+CREATE POLICY "Allow public read on POIs of published guides" ON guide_poi
 FOR SELECT USING (
   (SELECT status FROM guides WHERE id = guide_id) = 'published'
 );
 
-CREATE POLICY "Allow full access for editors/admins on sections" ON guide_sections
+CREATE POLICY "Allow full access for editors/admins on POIs" ON guide_poi
 FOR ALL USING (
     (get_user_role() IN ('editor', 'admin')) OR
     (auth.uid() = (SELECT author_id FROM guides WHERE id = guide_id))
@@ -237,7 +237,7 @@ new_guide AS (
     details = EXCLUDED.details
   RETURNING id
 )
-INSERT INTO guide_sections (guide_id, "order", texts, lat, lon)
+INSERT INTO guide_poi (guide_id, "order", texts, lat, lon)
 VALUES
   ((SELECT id FROM new_guide), 1, '{"en": {"title": "Gate of the Pomegranates", "description": "Classic ascent from Plaza Nueva to the monumental Gate of the Pomegranates."}}', 37.1745, -3.5936),
   ((SELECT id FROM new_guide), 2, '{"en": {"title": "Alhambra Forest", "description": "Historic forest planted in the time of Charles V."}}', 37.1755, -3.5920),
