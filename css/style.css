@@ -448,17 +448,18 @@ html, body {
     max-width: 200px;
 }
 
-/* User Menu Dropdown */
-.user-menu-container {
+/* Dropdown Menus in Activity Bar */
+.dropdown-container {
     position: relative;
     display: inline-block;
+    width: 100%;
 }
 
-.user-menu {
+.dropdown-menu {
     display: none; /* Hidden by default */
     position: absolute;
-    right: 0;
-    top: 45px; /* Position below the activity bar */
+    left: var(--activity-bar-width); /* Position next to the activity bar */
+    top: 0;
     background-color: #f9f9f9;
     min-width: 200px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
@@ -468,11 +469,11 @@ html, body {
     text-align: left;
 }
 
-.user-menu.visible {
+.dropdown-menu.visible {
     display: block;
 }
 
-.user-menu .user-email {
+.dropdown-menu .user-email {
     color: #333;
     font-weight: bold;
     padding-bottom: 8px;
@@ -482,7 +483,7 @@ html, body {
     white-space: normal;
 }
 
-.user-menu .logout-btn {
+.dropdown-menu .logout-btn {
     width: 100%;
     text-align: left;
     padding: 8px 12px;
@@ -492,15 +493,14 @@ html, body {
     cursor: pointer;
 }
 
-.user-menu .logout-btn:hover {
+.dropdown-menu .logout-btn:hover {
     background-color: #f1f1f1;
 }
 
 /* Splash screen specific positioning */
-.splash-footer .user-menu {
+.splash-footer .dropdown-menu {
     top: auto;
     bottom: 50px; /* Position above the splash footer button */
-    right: auto;
     left: 50%;
     transform: translateX(-50%);
 }

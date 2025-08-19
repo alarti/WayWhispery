@@ -95,8 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Main layout
         logoBtn.addEventListener('click', () => switchSidebarView('guides'));
         activityMapBtn.addEventListener('click', () => switchSidebarView('map'));
-        langBtn.addEventListener('click', () => {
-            document.getElementById('splash-screen').classList.remove('hidden');
+        langBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('lang-menu').classList.toggle('visible');
         });
 
         // Modals
@@ -104,8 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Close user menus if clicking outside
         window.addEventListener('click', (event) => {
-            if (!event.target.closest('.user-menu-container')) {
-                document.querySelectorAll('.user-menu.visible').forEach(menu => menu.classList.remove('visible'));
+            if (!event.target.closest('.dropdown-container')) {
+                document.querySelectorAll('.dropdown-menu.visible').forEach(menu => menu.classList.remove('visible'));
             }
         });
 
@@ -179,9 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUIforAuth() {
         if (currentUser) {
             authContainer.innerHTML = `
-                <div class="user-menu-container">
+                <div class="dropdown-container">
                     <button class="activity-btn" id="user-menu-btn" title="User Menu"><i class="fas fa-user-circle"></i></button>
-                    <div class="user-menu" id="main-user-menu">
+                    <div class="dropdown-menu" id="main-user-menu">
                         <div class="user-email">${currentUser.email}</div>
                         <button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
                     </div>
@@ -207,9 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentUser) {
             authContainer.innerHTML = `
-                <div class="user-menu-container">
+                <div class="dropdown-container">
                     <button class="btn-modern btn-modern-secondary" id="splash-user-menu-btn" title="User Menu"><i class="fas fa-user-circle"></i></button>
-                    <div class="user-menu" id="splash-user-menu">
+                    <div class="dropdown-menu" id="splash-user-menu">
                         <div class="user-email">${currentUser.email}</div>
                         <button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
                     </div>
@@ -1207,14 +1208,36 @@ document.addEventListener('DOMContentLoaded', () => {
             langBtn.innerHTML = `<img src="https://flagcdn.com/w20/${lang}.png" alt="${lang}">`;
         }
 
+        function populateLangMenu() {
+            const langMenu = document.getElementById('lang-menu');
+            const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+            langMenu.innerHTML = ''; // Clear previous options
+            for (const [code, name] of Object.entries(langMap)) {
+                const langItem = document.createElement('button');
+                langItem.className = 'logout-btn'; // Re-use style
+                langItem.innerHTML = `<img src="https://flagcdn.com/w20/${code}.png" alt="${name}" style="margin-right: 10px;"> ${name}`;
+                langItem.addEventListener('click', () => {
+                    startApp(code);
+                    langMenu.classList.remove('visible');
+                });
+                langMenu.appendChild(langItem);
+            }
+        }
+
         const startApp = async (lang) => {
             selectedLanguage = lang;
             updateLangButton(lang);
             splashLoader.classList.remove('hidden');
 
+            // This is a full restart, so we re-fetch guides.
+            // A lighter implementation might just call fetchAndDisplayGuides.
             try {
-                initializeMap();
-                setupEventListeners();
+                // Only setup event listeners once.
+                if(!map) {
+                    initializeMap();
+                    setupEventListeners();
+                    populateLangMenu();
+                }
 
                 // Set up auth listeners first
                 supabase.auth.onAuthStateChange(async (event, session) => {
