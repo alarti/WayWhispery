@@ -99,9 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Modals
         formModalCloseBtn.onclick = () => hideFormModal();
 
-        // File import
-        document.getElementById('import-file-input').addEventListener('change', handleFileUpload);
-
         // Live Mode & TTS Controls
         liveModeToggle.addEventListener('change', () => {
             if (liveModeToggle.checked) {
@@ -547,12 +544,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit POI Edit Mode"><i class="fas fa-times"></i></button>
                 <hr>
                 <button id="export-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export JSON"><i class="fas fa-file-export"></i></button>
-                <button id="import-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import JSON"><i class="fas fa-file-import"></i></button>
-                <button id="translate-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Auto-translate"><i class="fas fa-language"></i></button>
+                <button id="translate-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Duplicate & Translate"><i class="fas fa-language"></i></button>
             `;
             sidebarHeaderControls.querySelector('#save-guide-btn').onclick = saveGuide;
             sidebarHeaderControls.querySelector('#export-guide-btn').onclick = exportForTranslation;
-            sidebarHeaderControls.querySelector('#import-guide-btn').onclick = () => document.getElementById('import-file-input').click();
             sidebarHeaderControls.querySelector('#translate-guide-btn').onclick = showAutoTranslateModal;
             sidebarHeaderControls.querySelector('#exit-edit-btn').onclick = () => setMode('view');
         } else {
@@ -880,28 +875,6 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadJson(translationTemplate, `${currentGuide.slug}-${langToExport}-translation.json`);
     }
 
-    function handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const targetLang = prompt("Enter the 2-letter language code for this translation (e.g., 'es', 'fr'):");
-        if (!targetLang || targetLang.length !== 2) {
-            alert("Invalid language code.");
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const importedData = JSON.parse(e.target.result);
-                applyTranslation(importedData, targetLang.toLowerCase());
-            } catch (error) {
-                alert(`Error parsing JSON file: ${error.message}`);
-            }
-        };
-        reader.readAsText(file);
-        event.target.value = ''; // Reset input
-    }
 
     function showAutoTranslateModal() {
         const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
@@ -970,9 +943,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             });
 
-            applyTranslation(translatedData, targetLang);
-            hideFormModal(); // Hide loader
-            alert(`Translation to ${targetLang.toUpperCase()} complete. Please review the changes and save the guide.`);
+            // Instead of applying, prompt for duplication details
+            hideFormModal();
+            promptForDuplicationDetails(translatedData, targetLang);
 
         } catch (error) {
             hideFormModal();
@@ -980,30 +953,96 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function applyTranslation(data, lang) {
-        // Update guide details
-        if (!currentGuide.details[lang]) currentGuide.details[lang] = {};
-        currentGuide.details[lang].title = data.guide.title;
-        currentGuide.details[lang].summary = data.guide.summary;
+    function promptForDuplicationDetails(translatedData, targetLang) {
+        const suggestedSlug = `${currentGuide.slug}-${targetLang}`;
+        const formHTML = `
+            <p>Please confirm the details for the new, duplicated guide in <strong>${targetLang.toUpperCase()}</strong>.</p>
+            <form>
+                <div class="form-group">
+                    <label for="title">New Guide Title</label>
+                    <input type="text" name="title" value="${translatedData.guide.title}" required>
+                </div>
+                <div class="form-group">
+                    <label for="slug">New Guide Slug (URL)</label>
+                    <input type="text" name="slug" value="${suggestedSlug}" required pattern="[a-z0-9-]+">
+                </div>
+                <button type="submit" class="btn-modern">Create Duplicated Guide</button>
+            </form>
+        `;
 
-        // Update POI texts
-        pois.forEach(poi => {
-            if (data.pois[poi.id]) {
-                if (!poi.texts[lang]) poi.texts[lang] = {};
-                poi.texts[lang].title = data.pois[poi.id].title;
-                poi.texts[lang].description = data.pois[poi.id].description;
-            }
+        showFormModal('Confirm New Guide Details', formHTML, (data) => {
+            createDuplicateGuide(data, translatedData, targetLang);
+            return true;
         });
+    }
 
-        // Add new language to available_langs
-        if (!currentGuide.available_langs.includes(lang)) {
-            currentGuide.available_langs.push(lang);
+    async function createDuplicateGuide(details, translatedData, targetLang) {
+        showFormModal('Duplicating Guide...', '<div class="loader"></div>', () => {});
+
+        try {
+            // 1. Create the new guide entry
+            const newGuideObject = {
+                slug: details.slug,
+                details: {
+                    [targetLang]: {
+                        title: details.title,
+                        summary: translatedData.guide.summary
+                    }
+                },
+                default_lang: targetLang,
+                available_langs: [targetLang],
+                status: 'draft', // New duplicated guides are drafts by default
+                author_id: currentUser.id,
+                initial_lat: currentGuide.initial_lat,
+                initial_lon: currentGuide.initial_lon,
+                initial_zoom: currentGuide.initial_zoom,
+                cover_url: currentGuide.cover_url
+            };
+
+            const { data: newGuideData, error: guideError } = await supabase
+                .from('guides')
+                .insert(newGuideObject)
+                .select('id')
+                .single();
+
+            if (guideError || !newGuideData) {
+                throw new Error(`Failed to create new guide: ${guideError?.message || 'No data returned.'}`);
+            }
+
+            const newGuideId = newGuideData.id;
+
+            // 2. Prepare the new POIs (guide_sections)
+            const newSections = pois.map((originalPoi, index) => {
+                return {
+                    guide_id: newGuideId,
+                    order: originalPoi.order,
+                    lat: originalPoi.lat,
+                    lon: originalPoi.lon,
+                    texts: {
+                        [targetLang]: {
+                            title: translatedData.pois[originalPoi.id]?.title || '',
+                            description: translatedData.pois[originalPoi.id]?.description || ''
+                        }
+                    }
+                };
+            });
+
+            // 3. Bulk insert the new POIs
+            const { error: sectionsError } = await supabase.from('guide_sections').insert(newSections);
+
+            if (sectionsError) {
+                // Note: This could leave an orphaned guide. A more robust solution might use a transaction or delete the guide.
+                throw new Error(`Failed to create POIs for the new guide: ${sectionsError.message}`);
+            }
+
+            hideFormModal();
+            alert(`Successfully created new guide: "${details.title}". It is saved as a draft.`);
+            window.location.reload(); // Reload to see the new guide in the list
+
+        } catch (error) {
+            hideFormModal();
+            alert(`An error occurred during duplication: ${error.message}`);
         }
-
-        // Refresh UI
-        populateLanguageSelector();
-        switchLanguage(lang);
-        updateMapView();
     }
 
     function downloadJson(data, filename) {
