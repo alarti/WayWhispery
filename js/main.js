@@ -331,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPoiList();
             drawTourRoute();
 
-            const intros = introPhrases[currentGuide?.language || 'en'] || introPhrases.en;
+        const intros = introPhrases[currentGuide?.default_lang || 'en'] || introPhrases.en;
             const randomIntro = intros[Math.floor(Math.random() * intros.length)];
             const fullDescription = `${randomIntro} ${inRangeOfPoi.name}. ${inRangeOfPoi.description}`;
 
@@ -606,7 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Trigger text and speech
-        const intros = introPhrases[currentGuide?.language || 'en'] || introPhrases.en;
+        const intros = introPhrases[currentGuide?.default_lang || 'en'] || introPhrases.en;
         const randomIntro = intros[Math.floor(Math.random() * intros.length)];
         const fullDescription = `${randomIntro} ${poi.name}. ${poi.description}`;
 
