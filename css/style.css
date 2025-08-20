@@ -507,15 +507,24 @@ html, body {
 
 /* JSON Preview in Modal */
 .json-preview {
+    width: 100%;
+    min-height: 300px;
+    max-height: 40vh;
     background-color: #e9ecef;
+    border: 1px solid #ced4da;
     border-radius: 5px;
     padding: 15px;
-    max-height: 300px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-wrap: break-word;
     font-family: monospace;
     font-size: 0.85rem;
+    resize: vertical;
+}
+
+.validation-status {
+    margin-top: 10px;
+    font-weight: bold;
 }
 
 #activity-bar-logo {

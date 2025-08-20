@@ -1074,27 +1074,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showJsonPreviewModal(jsonString) {
-        // Format the JSON string for pretty printing
-        const formattedJson = JSON.stringify(JSON.parse(jsonString), null, 2);
+        let prettyJson;
+        try {
+            // Try to format the JSON for better readability.
+            prettyJson = JSON.stringify(JSON.parse(jsonString), null, 2);
+        } catch (e) {
+            // If it's invalid, show the raw string.
+            prettyJson = jsonString;
+        }
 
         const previewHTML = `
-            <p>The AI has generated the following guide. You can import it directly or export it as a file to save or edit.</p>
-            <pre class="json-preview"><code>${formattedJson}</code></pre>
+            <p>The AI has generated the following guide. You can edit the JSON below to fix any errors before importing.</p>
+            <textarea id="json-editor-textarea" class="json-preview">${prettyJson}</textarea>
+            <div id="json-validation-status" class="validation-status"></div>
             <div class="form-actions">
+                <button id="validate-json-btn" class="btn-modern btn-modern-secondary">Validate JSON</button>
                 <button id="import-from-preview-btn" class="btn-modern btn-modern-primary">Import Guide</button>
                 <button id="export-from-preview-btn" class="btn-modern btn-modern-secondary">Export JSON</button>
             </div>
         `;
 
-        // We use the generic modal here, but don't need the form submission callback
         showFormModal('AI Generation Result', previewHTML, () => {});
 
         // Manually add event listeners for our custom buttons
+        document.getElementById('validate-json-btn').addEventListener('click', () => {
+            const editedJson = document.getElementById('json-editor-textarea').value;
+            const statusDiv = document.getElementById('json-validation-status');
+            try {
+                JSON.parse(editedJson);
+                statusDiv.textContent = 'JSON is valid!';
+                statusDiv.style.color = 'green';
+            } catch (error) {
+                statusDiv.textContent = `Invalid JSON: ${error.message}`;
+                statusDiv.style.color = 'red';
+            }
+        });
         document.getElementById('import-from-preview-btn').addEventListener('click', () => {
-            importGuides(jsonString);
+            const editedJson = document.getElementById('json-editor-textarea').value;
+            importGuides(editedJson);
         });
         document.getElementById('export-from-preview-btn').addEventListener('click', () => {
-            downloadJson(JSON.parse(jsonString), 'ai-generated-guide.json');
+            const editedJson = document.getElementById('json-editor-textarea').value;
+            try {
+                downloadJson(JSON.parse(editedJson), 'ai-generated-guide.json');
+            } catch (error) {
+                alert(`Cannot export invalid JSON. Please fix the errors first.\nError: ${error.message}`);
+            }
         });
     }
 
