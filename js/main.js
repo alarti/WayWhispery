@@ -1061,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const payload = {
-                model: 'gpt-4o-mini', // A capable model is needed for this task
+                model: 'openai',
                 messages: [{ role: 'user', content: prompt }]
             };
 
