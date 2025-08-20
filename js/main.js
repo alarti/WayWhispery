@@ -1097,14 +1097,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showJsonPreviewModal(jsonString) {
-        // Append closing characters as a suggestion, then attempt to format.
-        const suggestedJson = jsonString.trim() + '\n]}]}';
         let prettyJson;
         try {
-            prettyJson = JSON.stringify(JSON.parse(suggestedJson), null, 2);
+            // Try to format the JSON for better readability.
+            prettyJson = JSON.stringify(JSON.parse(jsonString), null, 2);
         } catch (e) {
-            // If it's still invalid, just show the suggested (unformatted) string.
-            prettyJson = suggestedJson;
+            // If it's invalid, show the raw string.
+            prettyJson = jsonString;
         }
 
         const previewHTML = `
