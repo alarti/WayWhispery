@@ -3,7 +3,7 @@
  * Author: Alberto Arce (Original)
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import Client from 'https://g4f.dev/dist/js/client.js';
+import { PollinationsAI } from './vendor/g4f-client.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const SUPABASE_URL = 'https://whfcesalellvnrbdcsbb.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndoZmNlc2FsZWxsdm5yYmRjc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNTY0NDMsImV4cCI6MjA3MDkzMjQ0M30.wjzU9y1pudSctnLxaIIAfG8FKbMalLbKU4rto99vP9E';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const g4fClient = new Client();
+    const g4fClient = new PollinationsAI();
 
     // -----------------------------------------------------------------------------
     // DOM Elements
