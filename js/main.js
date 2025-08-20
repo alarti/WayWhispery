@@ -930,13 +930,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             for (const guide of parsedData.guides) {
-                const { pois, ...guideData } = guide;
-                delete guideData.id; // Let DB handle the ID
+                const { pois, ...aiGuideData } = guide;
+
+                // Sanitize and construct the guide object to ensure all required fields are present
+                const cleanGuideData = {
+                    slug: aiGuideData.slug,
+                    details: aiGuideData.details,
+                    status: aiGuideData.status || 'draft',
+                    default_lang: aiGuideData.default_lang || 'en',
+                    available_langs: aiGuideData.available_langs || ['en'],
+                    author_id: currentUser.id, // Always set the importer as the author
+                    cover_url: aiGuideData.cover_url,
+                    initial_lat: aiGuideData.initial_lat,
+                    initial_lon: aiGuideData.initial_lon,
+                    initial_zoom: aiGuideData.initial_zoom
+                };
 
                 // 1. Upsert the guide itself, using slug as the conflict target
                 const { data: upsertedGuide, error: guideError } = await supabase
                     .from('guides')
-                    .upsert(guideData, { onConflict: 'slug' })
+                    .upsert(cleanGuideData, { onConflict: 'slug' })
                     .select('id')
                     .single();
 
@@ -1032,6 +1045,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 {
                   "slug": "a-unique-slug-for-the-guide-in-english",
                   "default_lang": "en",
+                  "available_langs": ["en"],
                   "status": "draft",
                   "details": { "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." } },
                   "pois": [
