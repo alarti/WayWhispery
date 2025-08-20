@@ -505,6 +505,19 @@ html, body {
     transform: translateX(-50%);
 }
 
+/* JSON Preview in Modal */
+.json-preview {
+    background-color: #e9ecef;
+    border-radius: 5px;
+    padding: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
 #activity-bar-logo {
     width: 28px;
     height: 28px;

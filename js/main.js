@@ -915,7 +915,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function importGuides(json) {
         let parsedData;
         try {
-            parsedData = JSON.parse(json);
+            // Clean the JSON string to remove common errors like trailing commas
+            const cleanedJson = json.replace(/,\s*([\]}])/g, '$1');
+            parsedData = JSON.parse(cleanedJson);
             if (!parsedData.guides || !Array.isArray(parsedData.guides)) {
                 throw new Error("Invalid JSON format: 'guides' array not found.");
             }
@@ -1060,14 +1062,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             jsonResponse = jsonMatch[0];
 
-            // The importGuides function will handle the rest (parsing, importing, reloading)
-            await importGuides(jsonResponse);
+            // Show the generated JSON in a preview modal
+            hideFormModal(); // Hide the "generating" loader
+            showJsonPreviewModal(jsonResponse);
 
         } catch (error) {
             hideFormModal();
             alert(`AI guide generation failed: ${error.message}`);
             console.error(error);
         }
+    }
+
+    function showJsonPreviewModal(jsonString) {
+        // Format the JSON string for pretty printing
+        const formattedJson = JSON.stringify(JSON.parse(jsonString), null, 2);
+
+        const previewHTML = `
+            <p>The AI has generated the following guide. You can import it directly or export it as a file to save or edit.</p>
+            <pre class="json-preview"><code>${formattedJson}</code></pre>
+            <div class="form-actions">
+                <button id="import-from-preview-btn" class="btn-modern btn-modern-primary">Import Guide</button>
+                <button id="export-from-preview-btn" class="btn-modern btn-modern-secondary">Export JSON</button>
+            </div>
+        `;
+
+        // We use the generic modal here, but don't need the form submission callback
+        showFormModal('AI Generation Result', previewHTML, () => {});
+
+        // Manually add event listeners for our custom buttons
+        document.getElementById('import-from-preview-btn').addEventListener('click', () => {
+            importGuides(jsonString);
+        });
+        document.getElementById('export-from-preview-btn').addEventListener('click', () => {
+            downloadJson(JSON.parse(jsonString), 'ai-generated-guide.json');
+        });
     }
 
 
