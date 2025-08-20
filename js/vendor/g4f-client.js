@@ -18,8 +18,7 @@ class CorsProxyManager {
         'https://api.codetabs.com/v1/proxy?quest=',
     ]) {
         if (!Array.isArray(proxies) || proxies.length === 0) {
-            throw new Error('CorsProxyManager requires a non-empty array of prox
-y URLs.');
+            throw new Error('CorsProxyManager requires a non-empty array of proxy URLs.');
         }
         this.proxies = proxies;
         this.currentIndex = 0;
@@ -40,8 +39,7 @@ y URLs.');
      */
     rotateProxy() {
         this.currentIndex = (this.currentIndex + 1) % this.proxies.length;
-        console.warn(`Rotated to next CORS proxy: ${this.proxies[this.currentInd
-ex]}`);
+        console.warn(`Rotated to next CORS proxy: ${this.proxies[this.currentIndex]}`);
     }
 }
 
@@ -49,10 +47,8 @@ class Client {
     constructor(options = {}) {
         this.proxyManager = new CorsProxyManager();
         this.baseUrl = options.baseUrl;
-        this.apiEndpoint = options.apiEndpoint || `${this.baseUrl}/chat/completi
-ons`;
-        this.imageEndpoint = options.imageEndpoint || `${this.baseUrl}/images/ge
-nerations`;
+        this.apiEndpoint = options.apiEndpoint || `${this.baseUrl}/chat/completions`;
+        this.imageEndpoint = options.imageEndpoint || `${this.baseUrl}/images/generations`;
         this.defaultModel = options.defaultModel || null;
         this.defaulImageModel = options.defaultImageModel || 'flux';
         this.apiKey = options.apiKey;
@@ -60,8 +56,7 @@ nerations`;
 
         this.extraHeaders = {
             'Content-Type': 'application/json',
-            ...(this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {})
-,
+            ...(this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {}),
             ...(options.extraHeaders || {})
         };
 
@@ -82,13 +77,11 @@ nerations`;
             try {
                 const response = await fetch(proxiedUrl, requestConfig);
                 if (!response.ok) {
-                    throw new Error(`Proxy fetch failed with status ${response.s
-tatus}`);
+                    throw new Error(`Proxy fetch failed with status ${response.status}`);
                 }
                 return response
             } catch (error) {
-                console.warn(`CORS proxy attempt ${attempt + 1}/${maxAttempts} f
-ailed for ${targetUrl}:`, error.message);
+                console.warn(`CORS proxy attempt ${attempt + 1}/${maxAttempts} failed for ${targetUrl}:`, error.message);
                 this.proxyManager.rotateProxy();
             }
         }
@@ -151,19 +144,16 @@ ailed for ${targetUrl}:`, error.message);
                 params.model = modelId;
 
                 if (this.imageEndpoint.includes('{prompt}')) {
-                    return this._defaultImageGeneration(params, { headers: this.
-extraHeaders });
+                    return this._defaultImageGeneration(params, { headers: this.extraHeaders });
                 }
-                return this._regularImageGeneration(params, { headers: this.extr
-aHeaders });
+                return this._regularImageGeneration(params, { headers: this.extraHeaders });
             }
         };
     }
 
     async _regularCompletion(response) {
         if (!response.ok) {
-            throw new Error(`API request failed with status ${response.status}`)
-;
+            throw new Error(`API request failed with status ${response.status}`);
         }
         return await response.json();
     }
@@ -217,8 +207,7 @@ aHeaders });
         url += '?' + encodedParams.toString();
         const response = await fetch(url, requestOptions);
         if (!response.ok) {
-            throw new Error(`Image generation request failed with status ${respo
-nse.status}`);
+            throw new Error(`Image generation request failed with status ${response.status}`);
         }
         return {data: [{url: response.url}]}
     }
@@ -231,10 +220,8 @@ nse.status}`);
           });
         if (!response.ok) {
             const errorBody = await response.text();
-            console.error("Image generation failed. Server response:", errorBody
-);
-            throw new Error(`Image generation request failed with status ${respo
-nse.status}`);
+            console.error("Image generation failed. Server response:", errorBody);
+            throw new Error(`Image generation request failed with status ${response.status}`);
         }
         return await response.json();
     }
@@ -279,41 +266,32 @@ class PollinationsAI extends Client {
           if (this._models.length > 0) return this._models;
           try {
             let [textModelsResponse, imageModelsResponse] = await Promise.all([
-                this._fetchWithProxyRotation('https://text.pollinations.ai/model
-s').catch(e => {
-                    console.error("Failed to fetch text models from all proxies:
-", e); return { data: [] };
+                this._fetchWithProxyRotation('https://text.pollinations.ai/models').catch(e => {
+                    console.error("Failed to fetch text models from all proxies:", e); return { data: [] };
                 }),
-                this._fetchWithProxyRotation('https://image.pollinations.ai/mode
-ls').catch(e => {
-                    console.error("Failed to fetch image models from all proxies
-:", e); return [];
+                this._fetchWithProxyRotation('https://image.pollinations.ai/models').catch(e => {
+                    console.error("Failed to fetch image models from all proxies:", e); return [];
                 }),
             ]);
             textModelsResponse = await textModelsResponse.json();
             imageModelsResponse = await imageModelsResponse.json();
-            const textModels = (textModelsResponse.data || textModelsResponse ||
- []);
+            const textModels = (textModelsResponse.data || textModelsResponse || []);
             this._models = [
                 ...textModels.map(model => {
-                    model.id = model.id || this.swapAliases[model.name]  || mode
-l.name;
+                    model.id = model.id || this.swapAliases[model.name]  || model.name;
                     model.type = model.type || 'chat';
                     return model
                 }),
                 ...imageModelsResponse.map(model => {
-                    return { id: this.swapAliases[model]  || model, type: 'image
-'};
+                    return { id: this.swapAliases[model]  || model, type: 'image'};
                 })
             ];
             return this._models;
           } catch (err) {
               console.error("Final fallback for Pollinations models:", err);
               return [
-                  { id: "gpt-4.1-mini", type: "chat" }, { id: "deepseek-v3", typ
-e: "chat" },
-                  { id: "flux", type: "image" }, { id: "gpt-image", type: "image
-" }
+                  { id: "gpt-4.1-mini", type: "chat" }, { id: "deepseek-v3", type: "chat" },
+                  { id: "flux", type: "image" }, { id: "gpt-image", type: "image" }
               ];
           }
         }
@@ -341,38 +319,24 @@ class Together extends Client {
                 // Models Chat/Language
                 // meta-llama
                 "llama-3.2-3b": "meta-llama/Llama-3.2-3B-Instruct-Turbo",
-                "llama-2-70b": ["meta-llama/Llama-2-70b-hf", "meta-llama/Llama-2
--70b-hf"],
-                "llama-3-70b": ["meta-llama/Meta-Llama-3-70B-Instruct-Turbo", "m
-eta-llama/Llama-3-70b-chat-hf"],
-                "llama-3.2-90b": "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo
-",
-                "llama-3.3-70b": ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "me
-ta-llama/Llama-3.3-70B-Instruct-Turbo-Free"],
+                "llama-2-70b": ["meta-llama/Llama-2-70b-hf", "meta-llama/Llama-2-70b-hf"],
+                "llama-3-70b": ["meta-llama/Meta-Llama-3-70B-Instruct-Turbo", "meta-llama/Llama-3-70b-chat-hf"],
+                "llama-3.2-90b": "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
+                "llama-3.3-70b": ["meta-llama/Llama-3.3-70B-Instruct-Turbo", "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"],
                 "llama-4-scout": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-                "llama-3.1-8b": ["meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-"blackbox/meta-llama-3-1-8b"],
-                "llama-3.2-11b": "meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo
-",
-                "llama-3-8b": ["meta-llama/Llama-3-8b-chat-hf", "meta-llama/Meta
--Llama-3-8B-Instruct-Lite"],
-                "llama-3.1-70b": ["meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
-],
-                "llama-3.1-405b": "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo
-",
-                "llama-4-maverick": "meta-llama/Llama-4-Maverick-17B-128E-Instru
-ct-FP8",
+                "llama-3.1-8b": ["meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", "blackbox/meta-llama-3-1-8b"],
+                "llama-3.2-11b": "meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo",
+                "llama-3-8b": ["meta-llama/Llama-3-8b-chat-hf", "meta-llama/Meta-Llama-3-8B-Instruct-Lite"],
+                "llama-3.1-70b": ["meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"],
+                "llama-3.1-405b": "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
+                "llama-4-maverick": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
 
                 // deepseek-ai
                 "deepseek-r1": "deepseek-ai/DeepSeek-R1",
-                "deepseek-v3": ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek
--V3-p-dp"],
-                "deepseek-r1-distill-llama-70b": ["deepseek-ai/DeepSeek-R1-Disti
-ll-Llama-70B", "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"],
-                "deepseek-r1-distill-qwen-1.5b": "deepseek-ai/DeepSeek-R1-Distil
-l-Qwen-1.5B",
-                "deepseek-r1-distill-qwen-14b": "deepseek-ai/DeepSeek-R1-Distill
--Qwen-14B",
+                "deepseek-v3": ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-V3-p-dp"],
+                "deepseek-r1-distill-llama-70b": ["deepseek-ai/DeepSeek-R1-Distill-Llama-70B", "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"],
+                "deepseek-r1-distill-qwen-1.5b": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+                "deepseek-r1-distill-qwen-14b": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
 
                 // Qwen
                 "qwen-2.5-vl-72b": "Qwen/Qwen2.5-VL-72B-Instruct",
@@ -381,16 +345,13 @@ l-Qwen-1.5B",
                 "qwen-2-vl-72b": "Qwen/Qwen2-VL-72B-Instruct",
                 "qwq-32b": "Qwen/QwQ-32B",
                 "qwen-2.5-72b": "Qwen/Qwen2.5-72B-Instruct-Turbo",
-                "qwen-3-235b": ["Qwen/Qwen3-235B-A22B-fp8", "Qwen/Qwen3-235B-A22
-B-fp8-tput"],
+                "qwen-3-235b": ["Qwen/Qwen3-235B-A22B-fp8", "Qwen/Qwen3-235B-A22B-fp8-tput"],
                 "qwen-2-72b": "Qwen/Qwen2-72B-Instruct",
 
                 // mistralai
                 "mixtral-8x7b": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-                "mistral-small-24b": "mistralai/Mistral-Small-24B-Instruct-2501"
-,
-                "mistral-7b": ["mistralai/Mistral-7B-Instruct-v0.1", "mistralai/
-Mistral-7B-Instruct-v0.2", "mistralai/Mistral-7B-Instruct-v0.3"],
+                "mistral-small-24b": "mistralai/Mistral-Small-24B-Instruct-2501",
+                "mistral-7b": ["mistralai/Mistral-7B-Instruct-v0.1", "mistralai/Mistral-7B-Instruct-v0.2", "mistralai/Mistral-7B-Instruct-v0.3"],
 
                 // google
                 "gemma-2-27b": "google/gemma-2-27b-it",
@@ -406,20 +367,15 @@ Mistral-7B-Instruct-v0.2", "mistralai/Mistral-7B-Instruct-v0.3"],
 
                 // Models Image
                 // black-forest-labs
-                "flux": ["black-forest-labs/FLUX.1-schnell-Free", "black-forest-
-labs/FLUX.1-schnell", "black-forest-labs/FLUX.1.1-pro", "black-forest-labs/FLUX.
-1-pro", "black-forest-labs/FLUX.1-dev"],
-                "flux-schnell": ["black-forest-labs/FLUX.1-schnell-Free", "black
--forest-labs/FLUX.1-schnell"],
-                "flux-pro": ["black-forest-labs/FLUX.1.1-pro", "black-forest-lab
-s/FLUX.1-pro"],
+                "flux": ["black-forest-labs/FLUX.1-schnell-Free", "black-forest-labs/FLUX.1-schnell", "black-forest-labs/FLUX.1.1-pro", "black-forest-labs/FLUX.1-pro", "black-forest-labs/FLUX.1-dev"],
+                "flux-schnell": ["black-forest-labs/FLUX.1-schnell-Free", "black-forest-labs/FLUX.1-schnell"],
+                "flux-pro": ["black-forest-labs/FLUX.1.1-pro", "black-forest-labs/FLUX.1-pro"],
                 "flux-redux": "black-forest-labs/FLUX.1-redux",
                 "flux-depth": "black-forest-labs/FLUX.1-depth",
                 "flux-canny": "black-forest-labs/FLUX.1-canny",
                 "flux-kontext-max": "black-forest-labs/FLUX.1-kontext-max",
                 "flux-dev-lora": "black-forest-labs/FLUX.1-dev-lora",
-                "flux-dev": ["black-forest-labs/FLUX.1-dev", "black-forest-labs/
-FLUX.1-dev-lora"],
+                "flux-dev": ["black-forest-labs/FLUX.1-dev", "black-forest-labs/FLUX.1-dev-lora"],
                 "flux-kontext-pro": "black-forest-labs/FLUX.1-kontext-pro",
 
                 ...options.modelAliases
@@ -458,8 +414,7 @@ FLUX.1-dev-lora"],
 
         try {
             console.log('Fetching Together API key via CORS proxy...');
-            const response = await this._fetchWithProxyRotation('https://www.cod
-egeneration.ai/activate-v2');
+            const response = await this._fetchWithProxyRotation('https://www.codegeneration.ai/activate-v2');
             const data = await response.json();
             if (data?.openAIParams?.apiKey) {
                 this.apiKey = data.openAIParams.apiKey;
@@ -471,8 +426,7 @@ egeneration.ai/activate-v2');
             }
         } catch (error) {
             console.error('Failed to get Together API key via proxy:', error);
-            throw new Error(`Failed to obtain Together API key: ${error.message}
-`);
+            throw new Error(`Failed to obtain Together API key: ${error.message}`);
         }
     }
 
@@ -484,14 +438,11 @@ egeneration.ai/activate-v2');
         if (this.modelAliases[model]) {
             const alias = this.modelAliases[model];
             if (Array.isArray(alias)) {
-                const selected = alias[Math.floor(Math.random() * alias.length)]
-;
-                console.log(`Together: Selected model '${selected}' from alias '
-${model}'`);
+                const selected = alias[Math.floor(Math.random() * alias.length)];
+                console.log(`Together: Selected model '${selected}' from alias '${model}'`);
                 return selected;
             }
-            console.log(`Together: Using model '${alias}' for alias '${model}'`)
-;
+            console.log(`Together: Using model '${alias}' for alias '${model}'`);
             return alias;
         }
 
@@ -578,8 +529,7 @@ ${model}'`);
                     }
 
                     const modelConfig = this._getModelConfig(params.model);
-                    if (!params.stop && modelConfig.stop && modelConfig.stop.len
-gth > 0) {
+                    if (!params.stop && modelConfig.stop && modelConfig.stop.length > 0) {
                         params.stop = modelConfig.stop;
                     }
 
@@ -591,8 +541,7 @@ gth > 0) {
                         },
                         body: JSON.stringify(params)
                     };
-                    const response = await fetch(this.apiEndpoint, requestOption
-s);
+                    const response = await fetch(this.apiEndpoint, requestOptions);
                     if (params.stream) {
                         return this._streamCompletion(response);
                     } else {
@@ -612,15 +561,12 @@ s);
                 if (this._cachedModels.length < 1) {
                     await this.loadModels();
                 }
-                params.model = params.model ? this._getModel(params.model) : thi
-s.defaulImageModel;
+                params.model = params.model ? this._getModel(params.model) : this.defaulImageModel;
                 if (!this.imageModels.includes(params.model)) {
-                    console.warn(`Model '${params.model}' is not a valid image m
-odel. Falling back to default.`);
+                    console.warn(`Model '${params.model}' is not a valid image model. Falling back to default.`);
                     params.model = this.defaulImageModel
                 }
-                return this._regularImageGeneration(params, { headers: this.extr
-aHeaders });
+                return this._regularImageGeneration(params, { headers: this.extraHeaders });
             }
         };
     }
@@ -644,10 +590,8 @@ class Puter {
                     if (options.stream) {
                         return this._streamCompletion(messages, options);
                     }
-                    const response = await (await this.puter).ai.chat(messages,
-false, options);
-                    if (response.choices == undefined && response.message !== un
-defined) {
+                    const response = await (await this.puter).ai.chat(messages,false, options);
+                    if (response.choices == undefined && response.message !== undefined) {
                         return {
                             ...response,
                             get choices() {
@@ -665,14 +609,11 @@ defined) {
     get models() {
       return {
         list: async () => {
-            const response = await fetch("https://api.puter.com/puterai/chat/mod
-els/");
+            const response = await fetch("https://api.puter.com/puterai/chat/models/");
             let models = await response.json();
             models = models.models;
-            const blockList = ["abuse", "costly", "fake", "model-fallback-test-1
-"];
-            models = models.filter((model) => !model.includes("/") && !blockList
-.includes(model));
+            const blockList = ["abuse", "costly", "fake", "model-fallback-test-1"];
+            models = models.filter((model) => !model.includes("/") && !blockList.includes(model));
             return models.map(model => {
                 return {
                     id: model,
@@ -686,8 +627,7 @@ els/");
     async _injectPuter() {
         return new Promise((resolve, reject) => {
             if (typeof window === 'undefined') {
-                reject(new Error('Puter can only be used in a browser environmen
-t'));
+                reject(new Error('Puter can only be used in a browser environment'));
                 return;
             }
             if (window.puter) {
@@ -706,8 +646,7 @@ t'));
     }
 
     async *_streamCompletion(messages, options = {}) {
-        for await (const item of await ((await this.puter).ai.chat(messages, fal
-se, options))) {
+        for await (const item of await ((await this.puter).ai.chat(messages, false, options))) {
           if (item.choices == undefined && item.text !== undefined) {
             yield {
                 ...item,
@@ -725,15 +664,12 @@ se, options))) {
 class HuggingFace extends Client {
     constructor(options = {}) {
         if (!options.apiKey) {
-            if (typeof process !== 'undefined' && process.env.HUGGINGFACE_API_KE
-Y) {
+            if (typeof process !== 'undefined' && process.env.HUGGINGFACE_API_KEY) {
                 options.apiKey = process.env.HUGGINGFACE_API_KEY;
-            } else if (typeof localStorage !== "undefined" && localStorage.getIt
-em("HuggingFace-api_key")) {
+            } else if (typeof localStorage !== "undefined" && localStorage.getItem("HuggingFace-api_key")) {
                 options.apiKey = localStorage.getItem("HuggingFace-api_key");
             } else {
-                throw new Error("HuggingFace API key is required. Set it in the
-options or as an environment variable HUGGINGFACE_API_KEY.");
+                throw new Error("HuggingFace API key is required. Set it in the options or as an environment variable HUGGINGFACE_API_KEY.");
             }
         }
         super({
@@ -757,8 +693,7 @@ options or as an environment variable HUGGINGFACE_API_KEY.");
                 "flux": "black-forest-labs/FLUX.1-dev",
                 "flux-dev": "black-forest-labs/FLUX.1-dev",
                 "flux-schnell": "black-forest-labs/FLUX.1-schnell",
-                "stable-diffusion-3.5-large": "stabilityai/stable-diffusion-3.5-
-large",
+                "stable-diffusion-3.5-large": "stabilityai/stable-diffusion-3.5-large",
                 "sdxl-1.0": "stabilityai/stable-diffusion-xl-base-1.0",
                 "sdxl-turbo": "stabilityai/sdxl-turbo",
                 "sd-3.5-large": "stabilityai/stable-diffusion-3.5-large",
@@ -778,8 +713,7 @@ large",
     get models() {
       return {
         list: async () => {
-            const response = await fetch("https://huggingface.co/api/models?infe
-rence=warm&&expand[]=inferenceProviderMapping");
+            const response = await fetch("https://huggingface.co/api/models?inference=warm&&expand[]=inferenceProviderMapping");
             if (!response.ok) {
               throw new Error(`Failed to fetch models: ${response.status}`);
             }
@@ -787,8 +721,7 @@ rence=warm&&expand[]=inferenceProviderMapping");
             return data
                 .filter(model =>
                     model.inferenceProviderMapping?.some(provider =>
-                        provider.status === "live" && provider.task === "convers
-ational"
+                        provider.status === "live" && provider.task === "conversational"
                     )
                 )
                 .concat(Object.keys(this.providerMapping).map(model => ({
@@ -803,14 +736,12 @@ ational"
         if (this.providerMapping[model]) {
             return this.providerMapping[model];
         }
-        const response = await fetch(`https://huggingface.co/api/models/${model}
-?expand[]=inferenceProviderMapping`, {
+        const response = await fetch(`https://huggingface.co/api/models/${model}?expand[]=inferenceProviderMapping`, {
             headers: this.extraHeaders
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch model mapping: ${response.status}`)
-;
+            throw new Error(`Failed to fetch model mapping: ${response.status}`);
         }
 
         const modelData = await response.json();
@@ -850,8 +781,7 @@ ational"
 
                         const task = providerMapping[providerKey].task;
                         if (task !== "conversational") {
-                            throw new Error(`Model is not supported: ${model} ta
-sk: ${task}`);
+                            throw new Error(`Model is not supported: ${model} task: ${task}`);
                         }
 
                         model = providerMapping[providerKey].providerId;
@@ -866,8 +796,7 @@ sk: ${task}`);
                             ...options
                         })
                     };
-                    const response = await fetch(`${apiBase}/chat/completions`,
-requestOptions);
+                    const response = await fetch(`${apiBase}/chat/completions`, requestOptions);
                     if (params.stream) {
                         return this._streamCompletion(response);
                     } else {
