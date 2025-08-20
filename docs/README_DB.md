@@ -17,10 +17,10 @@ El esquema completo se define en `supabase/migrations/0001_init.sql`. A continua
     -   `status` (text): `draft` o `published`. Controla la visibilidad pública.
     -   `author_id` (uuid, FK): Referencia al autor de la guía.
 
--   `guide_sections`:
-    -   Secciones de contenido de cada guía.
+-   `guide_poi`:
+    -   Almacena los Puntos de Interés (POIs) de cada guía.
     -   `guide_id` (uuid, FK): Referencia a la guía a la que pertenece.
-    -   `order` (int): Para ordenar las secciones.
+    -   `order` (int): Para ordenar los POIs.
 
 -   `tags` y `guide_tags`:
     -   Implementan una relación muchos-a-muchos para etiquetar las guías.
@@ -33,7 +33,7 @@ El esquema completo se define en `supabase/migrations/0001_init.sql`. A continua
 RLS está habilitado en todas las tablas para garantizar que los datos solo sean accesibles por los usuarios autorizados.
 
 -   **Principio general**:
-    -   **Lectura pública**: Cualquiera (incluso usuarios anónimos) puede leer las guías con `status = 'published'` y su contenido asociado (secciones, tags, media).
+    -   **Lectura pública**: Cualquiera (incluso usuarios anónimos) puede leer las guías con `status = 'published'` y su contenido asociado (POIs, tags, media).
     -   **Lectura de borradores**: Solo el autor de una guía o un `editor`/`admin` puede verla si está en estado `draft`.
     -   **Escritura (Crear, Actualizar, Eliminar)**: Reservada exclusivamente para usuarios con rol `editor` o `admin`. Un autor con rol `viewer` no puede editar sus propias guías una vez creadas (esto es una decisión de diseño para un control editorial centralizado).
 

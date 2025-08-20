@@ -18,7 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Layout
     const activityMapBtn = document.getElementById('activity-map-btn');
-    const sidebarLogo = document.getElementById('sidebar-logo');
+    const logoBtn = document.getElementById('logo-btn');
+    const langBtn = document.getElementById('lang-btn');
     const sidebarViewTitle = document.getElementById('sidebar-view-title');
     const sidebarHeaderControls = document.getElementById('sidebar-header-controls');
     const sidebarGuidesView = document.getElementById('sidebar-guides-view');
@@ -34,7 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const guideMetaContainer = document.getElementById('guide-meta-container');
     const authorNameSpan = document.getElementById('author-name');
     const poiList = document.getElementById('poi-list');
-    const languageSelector = document.getElementById('language-selector');
 
     // Map Overlays & Controls
     const guideTextOverlay = document.getElementById('guide-text-overlay');
@@ -83,6 +83,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentUser = null;
     let userProfile = null;
     let isEditMode = false;
+    let selectedLanguage = null;
+    let poisToDelete = [];
 
     // -----------------------------------------------------------------------------
     // Layout & UI Logic
@@ -91,11 +93,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setupEventListeners() {
         // Main layout
-        sidebarLogo.addEventListener('click', () => switchSidebarView('guides'));
+        logoBtn.addEventListener('click', () => switchSidebarView('guides'));
         activityMapBtn.addEventListener('click', () => switchSidebarView('map'));
+        langBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('lang-menu').classList.toggle('visible');
+        });
 
         // Modals
         formModalCloseBtn.onclick = () => hideFormModal();
+
+        // Close user menus if clicking outside
+        window.addEventListener('click', (event) => {
+            if (!event.target.closest('.dropdown-container')) {
+                document.querySelectorAll('.dropdown-menu.visible').forEach(menu => menu.classList.remove('visible'));
+            }
+        });
+
+        document.getElementById('import-guides-input').addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    importGuides(e.target.result);
+                } catch (error) {
+                    alert(`Error parsing JSON file: ${error.message}`);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        });
 
         // Live Mode & TTS Controls
         liveModeToggle.addEventListener('change', () => {
@@ -122,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function switchSidebarView(viewName) {
         const sidebar = document.querySelector('.sidebar');
-        const newActiveBtn = viewName === 'map' ? activityMapBtn : sidebarLogo;
+        const newActiveBtn = viewName === 'map' ? activityMapBtn : logoBtn;
         const isAlreadyActive = newActiveBtn.classList.contains('active');
 
         // If the clicked button's view is already active, just toggle visibility
@@ -132,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         activityMapBtn.classList.remove('active');
-        sidebarLogo.classList.remove('active');
+        logoBtn.classList.remove('active');
         newActiveBtn.classList.add('active');
 
         if (viewName === 'guides') {
@@ -150,15 +178,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateUIforAuth() {
-        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
         if (currentUser) {
-            authContainer.innerHTML = `<button id="logout-btn" class="activity-btn" title="Logout"><i class="fas fa-sign-out-alt"></i></button>`;
-            authContainer.querySelector('#logout-btn').addEventListener('click', logout);
+            authContainer.innerHTML = `
+                <div class="dropdown-container">
+                    <button class="activity-btn" id="user-menu-btn" title="User Menu"><i class="fas fa-user-circle"></i></button>
+                    <div class="dropdown-menu" id="main-user-menu">
+                        <div class="user-email">${currentUser.email}</div>
+                        <button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>
+                </div>`;
+
+            authContainer.querySelector('#user-menu-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('main-user-menu').classList.toggle('visible');
+            });
+            authContainer.querySelector('.logout-btn').addEventListener('click', logout);
+
         } else {
             authContainer.innerHTML = `<button id="login-btn" class="activity-btn" title="Login"><i class="fas fa-sign-in-alt"></i></button>`;
             authContainer.querySelector('#login-btn').addEventListener('click', loginWithGoogle);
         }
         updateHeaderControls();
+    }
+
+    function updateSplashAuthUI() {
+        const splashFooter = document.querySelector('.splash-footer');
+        const authContainer = splashFooter?.querySelector('.splash-auth-container');
+        if (!authContainer) return;
+
+        if (currentUser) {
+            authContainer.innerHTML = `
+                <div class="dropdown-container">
+                    <button class="btn-modern btn-modern-secondary" id="splash-user-menu-btn" title="User Menu"><i class="fas fa-user-circle"></i></button>
+                    <div class="dropdown-menu" id="splash-user-menu">
+                        <div class="user-email">${currentUser.email}</div>
+                        <button class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>
+                </div>`;
+
+            authContainer.querySelector('#splash-user-menu-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('splash-user-menu').classList.toggle('visible');
+            });
+            authContainer.querySelector('.logout-btn').addEventListener('click', logout);
+        } else {
+            // This part is redundant as the default HTML is the login button, but good for clarity on re-renders
+            authContainer.innerHTML = `<button id="splash-login-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-sign-in-alt"></i> Login</button>`;
+            const loginBtn = document.getElementById('splash-login-btn');
+            if(loginBtn) loginBtn.addEventListener('click', loginWithGoogle);
+        }
     }
 
     function updateMapView() {
@@ -296,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPoiList();
             drawTourRoute();
 
-            const intros = introPhrases[currentGuide?.language || 'en'] || introPhrases.en;
+        const intros = introPhrases[currentGuide?.default_lang || 'en'] || introPhrases.en;
             const randomIntro = intros[Math.floor(Math.random() * intros.length)];
             const fullDescription = `${randomIntro} ${inRangeOfPoi.name}. ${inRangeOfPoi.description}`;
 
@@ -355,8 +423,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchAndDisplayGuides() {
+        if (!selectedLanguage) {
+            guideCatalogList.innerHTML = '<p>Select a language from the splash screen to see available guides.</p>';
+            return;
+        }
+
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
-        let query = supabase.from('guides').select('slug, details, default_lang');
+        // Security Note: Supabase client library uses parameterized queries, preventing SQL injection.
+        // The RLS policies defined in the database provide row-level access control.
+        let query = supabase.from('guides')
+            .select('slug, details, default_lang, available_langs')
+            .contains('available_langs', `{${selectedLanguage}}`); // Filter by selected language
 
         // Editors can see their own drafts, everyone can see published guides
         if (isEditor && currentUser) {
@@ -373,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (!guides || guides.length === 0) {
-            guideCatalogList.innerHTML = '<p>No guides found.</p>';
+            guideCatalogList.innerHTML = `<p>No guides found for the selected language.</p>`;
             return;
         }
 
@@ -392,9 +469,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            const lang = guide.default_lang || 'en';
-            const firstAvailableLang = Object.keys(details_obj || {})[0];
-            const guideDetails = details_obj?.[lang] || details_obj?.[firstAvailableLang] || { title: 'Untitled', summary: '' };
+            // Use the selected language for display, fallback to default, then first available
+            const guideDetails = details_obj?.[selectedLanguage] || details_obj?.[guide.default_lang] || details_obj?.[Object.keys(details_obj || {})[0]] || { title: 'Untitled', summary: '' };
 
             const title = guideDetails.title;
             const summary = guideDetails.summary;
@@ -411,63 +487,34 @@ document.addEventListener('DOMContentLoaded', () => {
             alert(`Error loading guide: ${error?.message || 'Guide not found.'}`);
             return;
         }
-        const { data: sectionsData, error: sectionsError } = await supabase.from('guide_sections').select('*').eq('guide_id', guideData.id).order('order');
+        const { data: sectionsData, error: sectionsError } = await supabase.from('guide_poi').select('*').eq('guide_id', guideData.id).order('order');
         if (sectionsError) {
-            alert(`Error loading guide sections: ${sectionsError.message}`);
+            alert(`Error loading guide POIs: ${sectionsError.message}`);
             return;
         }
         currentGuide = guideData;
-        // The raw POI data now contains the JSONB 'texts' field
         pois = sectionsData;
         tourRoute = pois.map(p => p.id);
 
-        populateLanguageSelector();
-        switchLanguage(currentGuide.default_lang); // Switch to default language
+        // Process guide texts for the guide's default language
+        const langCode = currentGuide.default_lang;
+        currentGuide.current_lang = langCode; // Set current lang for consistency
 
-        map.setView([currentGuide.initial_lat, currentGuide.initial_lon], currentGuide.initial_zoom);
-        updateMapView();
-        switchSidebarView('map');
-
-        if (isMobile()) {
-            document.querySelector('.sidebar').classList.remove('active');
-        }
-    }
-
-    function populateLanguageSelector() {
-        languageSelector.innerHTML = '';
-        const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
-        currentGuide.available_langs.forEach(langCode => {
-            const option = document.createElement('option');
-            option.value = langCode;
-            option.textContent = langMap[langCode] || langCode;
-            languageSelector.appendChild(option);
-        });
-        languageSelector.addEventListener('change', (e) => switchLanguage(e.target.value));
-    }
-
-    function switchLanguage(langCode) {
-        // Update the current language state
-        currentGuide.current_lang = langCode;
-        languageSelector.value = langCode;
-
-        // Safely parse guide details
         let guideDetailsObj = currentGuide.details;
         if (typeof guideDetailsObj === 'string') {
             try { guideDetailsObj = JSON.parse(guideDetailsObj); } catch (e) { guideDetailsObj = {}; }
         }
-        const firstGuideLang = Object.keys(guideDetailsObj)[0];
-        const guideDetails = guideDetailsObj?.[langCode] || guideDetailsObj?.[currentGuide.default_lang] || guideDetailsObj?.[firstGuideLang] || {};
+        const guideDetails = guideDetailsObj?.[langCode] || {};
         currentGuide.title = guideDetails.title || 'Untitled Guide';
         currentGuide.summary = guideDetails.summary || '';
 
-        // Safely parse POI texts
+        // Process POI texts for the guide's default language
         pois.forEach(poi => {
             let poiTextsObj = poi.texts;
             if (typeof poiTextsObj === 'string') {
                 try { poiTextsObj = JSON.parse(poiTextsObj); } catch (e) { poiTextsObj = {}; }
             }
-            const firstPoiLang = Object.keys(poiTextsObj)[0];
-            const poiTexts = poiTextsObj?.[langCode] || poiTextsObj?.[currentGuide.default_lang] || poiTextsObj?.[firstPoiLang] || {};
+            const poiTexts = poiTextsObj?.[langCode] || {};
             poi.name = poiTexts.title || 'Untitled POI';
             poi.description = poiTexts.description || '';
         });
@@ -476,8 +523,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const ttsLangMap = { en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN' };
         utterance.lang = ttsLangMap[langCode] || 'en-US';
 
-        // Re-render the UI
+        map.setView([currentGuide.initial_lat, currentGuide.initial_lon], currentGuide.initial_zoom);
         updateMapView();
+        switchSidebarView('map');
+
+        if (isMobile()) {
+            document.querySelector('.sidebar').classList.remove('active');
+        }
     }
 
     // -----------------------------------------------------------------------------
@@ -491,11 +543,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentView = sidebarGuidesView.classList.contains('active') ? 'guides' : 'map';
 
         if (currentView === 'guides') {
-            const createBtn = document.createElement('button');
-            createBtn.className = 'btn-modern btn-modern-sm';
-            createBtn.innerHTML = '<i class="fas fa-plus"></i> New';
-            createBtn.onclick = createNewGuide;
-            sidebarHeaderControls.appendChild(createBtn);
+            sidebarHeaderControls.innerHTML = `
+                <button id="generate-guide-btn" class="btn-modern btn-modern-sm btn-modern-primary" title="Generate Guide with AI"><i class="fas fa-magic"></i></button>
+                <button id="import-guides-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import Guides"><i class="fas fa-file-import"></i></button>
+                <button id="export-all-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export All Guides"><i class="fas fa-file-export"></i></button>
+                <button id="create-guide-btn" class="btn-modern btn-modern-sm" title="New Guide"><i class="fas fa-plus"></i> New</button>
+            `;
+            sidebarHeaderControls.querySelector('#generate-guide-btn').onclick = showGenerateGuideModal;
+            sidebarHeaderControls.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
+            sidebarHeaderControls.querySelector('#export-all-btn').onclick = exportAllGuides;
+            sidebarHeaderControls.querySelector('#create-guide-btn').onclick = createNewGuide;
         } else if (currentView === 'map' && currentGuide) {
             setMode(isEditMode ? 'edit' : 'view'); // Re-render controls for map view
         }
@@ -508,21 +565,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isEditor || !currentGuide) return;
 
         if (isEditMode) {
+            // POI Edit Mode
             map.on('click', onMapClick);
             sidebarHeaderControls.innerHTML = `
-                <button id="save-guide-btn" class="btn-modern btn-modern-sm" title="Save Guide"><i class="fas fa-save"></i></button>
-                <button id="export-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export for Translation"><i class="fas fa-file-export"></i></button>
-                <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit Edit Mode"><i class="fas fa-times"></i></button>
+                <button id="save-guide-btn" class="btn-modern btn-modern-sm" title="Save Changes"><i class="fas fa-save"></i></button>
+                <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit POI Edit Mode"><i class="fas fa-times"></i></button>
+                <hr>
+                <button id="export-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export JSON"><i class="fas fa-file-export"></i></button>
+                <button id="translate-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Duplicate & Translate"><i class="fas fa-language"></i></button>
             `;
             sidebarHeaderControls.querySelector('#save-guide-btn').onclick = saveGuide;
             sidebarHeaderControls.querySelector('#export-guide-btn').onclick = exportForTranslation;
+            sidebarHeaderControls.querySelector('#translate-guide-btn').onclick = showAutoTranslateModal;
             sidebarHeaderControls.querySelector('#exit-edit-btn').onclick = () => setMode('view');
         } else {
+            // View Mode with options for editors
             map.off('click', onMapClick);
             sidebarHeaderControls.innerHTML = `
-                <button id="edit-guide-btn" class="btn-modern btn-modern-sm" title="Edit Guide"><i class="fas fa-edit"></i></button>
+                <button id="edit-guide-details-btn" class="btn-modern btn-modern-sm" title="Edit Guide Details"><i class="fas fa-cog"></i></button>
+                <button id="edit-pois-btn" class="btn-modern btn-modern-sm" title="Edit POIs"><i class="fas fa-map-marker-alt"></i></button>
             `;
-            sidebarHeaderControls.querySelector('#edit-guide-btn').onclick = () => setMode('edit');
+            sidebarHeaderControls.querySelector('#edit-guide-details-btn').onclick = showGuideDetailsForm;
+            sidebarHeaderControls.querySelector('#edit-pois-btn').onclick = () => setMode('edit');
         }
         renderPois();
         renderPoiList();
@@ -577,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Trigger text and speech
-        const intros = introPhrases[currentGuide?.language || 'en'] || introPhrases.en;
+        const intros = introPhrases[currentGuide?.default_lang || 'en'] || introPhrases.en;
         const randomIntro = intros[Math.floor(Math.random() * intros.length)];
         const fullDescription = `${randomIntro} ${poi.name}. ${poi.description}`;
 
@@ -616,22 +680,47 @@ document.addEventListener('DOMContentLoaded', () => {
     function editPoi(poiId) {
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
-        showFormModal('Edit POI', `
+
+        const lang = currentGuide.current_lang || currentGuide.default_lang;
+        const texts = poi.texts[lang] || { title: '', description: '' };
+
+        showFormModal(`Edit POI (in ${lang.toUpperCase()})`, `
             <form>
-                <div class="form-group"><label for="name">Name</label><input type="text" name="name" value="${poi.name}" required></div>
-                <div class="form-group"><label for="description">Description</label><textarea name="description" rows="3">${poi.description}</textarea></div>
+                <div class="form-group">
+                    <label for="name">Name</label>
+                    <input type="text" name="name" value="${texts.title}" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea name="description" rows="3">${texts.description}</textarea>
+                </div>
                 <button type="submit" class="btn-modern">Save Changes</button>
             </form>`, (data) => {
+            // Ensure the texts object for the language exists
+            if (!poi.texts[lang]) {
+                poi.texts[lang] = {};
+            }
+            // Update the JSONB texts object for the specific language
+            poi.texts[lang].title = data.name;
+            poi.texts[lang].description = data.description;
+
+            // Also update the top-level properties for immediate UI refresh
             poi.name = data.name;
             poi.description = data.description;
-            renderPois();
+
+            // Re-render the list to show the new name
             renderPoiList();
+            // No need to re-render all POI markers on the map unless their position changes
             return true;
         });
     }
 
     function deletePoi(poiId) {
         if (!confirm('Are you sure?')) return;
+        // If the POI has a real ID (not a temp one), mark it for deletion.
+        if (!poiId.startsWith('temp-')) {
+            poisToDelete.push(poiId);
+        }
         pois = pois.filter(p => p.id !== poiId);
         tourRoute = tourRoute.filter(id => id !== poiId);
         renderPois();
@@ -642,13 +731,42 @@ document.addEventListener('DOMContentLoaded', () => {
     async function createNewGuide() {
         showFormModal('Create New Guide', `
             <form>
-                <div class="form-group"><label for="title">Title</label><input type="text" name="title" required></div>
-                <div class="form-group"><label for="slug">Slug</label><input type="text" name="slug" required pattern="[a-z0-9-]+"></div>
-                <div class="form-group"><label for="summary">Summary</label><textarea name="summary" rows="3"></textarea></div>
+                <div class="form-group"><label for="title">Title (in ${selectedLanguage.toUpperCase()})</label><input type="text" name="title" required></div>
+                <div class="form-group"><label for="slug">URL Slug</label><input type="text" name="slug" required pattern="[a-z0-9-]+" placeholder="e.g. my-cool-guide"></div>
+                <div class="form-group"><label for="summary">Summary (in ${selectedLanguage.toUpperCase()})</label><textarea name="summary" rows="3"></textarea></div>
                 <button type="submit" class="btn-modern">Create and Edit</button>
             </form>`, async (data) => {
-            const { data: guideData, error } = await supabase.from('guides').insert({ ...data, author_id: currentUser.id, status: 'draft', initial_lat: map.getCenter().lat, initial_lon: map.getCenter().lng, initial_zoom: map.getZoom() }).select().single();
-            if (error) { alert(`Error: ${error.message}`); return false; }
+            if (!selectedLanguage) {
+                alert("A language must be selected to create a guide.");
+                return false;
+            }
+
+            const newGuideData = {
+                slug: data.slug,
+                author_id: currentUser.id,
+                status: 'draft',
+                initial_lat: map.getCenter().lat,
+                initial_lon: map.getCenter().lng,
+                initial_zoom: map.getZoom(),
+                default_lang: selectedLanguage,
+                available_langs: [selectedLanguage],
+                details: {
+                    [selectedLanguage]: {
+                        title: data.title,
+                        summary: data.summary
+                    }
+                }
+            };
+
+            const { data: guideData, error } = await supabase.from('guides').insert(newGuideData).select().single();
+            if (error) {
+                alert(`Error creating guide: ${error.message}`);
+                return false;
+            }
+            if (!guideData) {
+                alert("Failed to create guide. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                return false;
+            }
             await loadGuide(guideData.slug);
             setMode('edit');
             return true;
@@ -656,16 +774,124 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveGuide() {
-        const sectionsToSave = pois.map((poi, index) => ({ guide_id: currentGuide.id, title: poi.name, body_md: poi.description, lat: poi.lat, lon: poi.lon, order: index, ...(poi.id.toString().startsWith('temp-') ? {} : { id: poi.id }) }));
-        const { error } = await supabase.from('guide_sections').upsert(sectionsToSave);
-        if (error) { alert(`Error saving: ${error.message}`); }
-        else { alert('Guide saved!'); await loadGuide(currentGuide.slug); }
+        // 1. Delete POIs that were marked for deletion
+        if (poisToDelete.length > 0) {
+            const { error: deleteError } = await supabase.from('guide_poi').delete().in('id', poisToDelete);
+            if (deleteError) {
+                alert(`Error deleting POIs: ${deleteError.message}`);
+                return; // Stop if deletion fails
+            }
+            poisToDelete = []; // Clear the array after successful deletion
+        }
+
+        // 2. Upsert (insert or update) the remaining POIs
+        const sectionsToSave = pois.map((poi, index) => {
+            // This needs to be adapted for the new multi-language structure
+            const poiData = {
+                guide_id: currentGuide.id,
+                texts: poi.texts, // Assuming poi.texts is the JSONB object
+                lat: poi.lat,
+                lon: poi.lon,
+                order: index
+            };
+            if (!poi.id.toString().startsWith('temp-')) {
+                poiData.id = poi.id;
+            }
+            return poiData;
+        });
+
+        // 2. Upsert (insert or update) the remaining POIs
+        if (sectionsToSave.length > 0) {
+            const { data: upsertData, error: upsertError } = await supabase.from('guide_poi').upsert(sectionsToSave).select();
+            if (upsertError) {
+                alert(`Error saving POIs: ${upsertError.message}`);
+                return;
+            }
+            if (!upsertData || upsertData.length === 0) {
+                alert("Failed to save POIs. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                return;
+            }
+        }
+
+        alert('Guide saved successfully!');
+        await loadGuide(currentGuide.slug); // Reload to get fresh data
+    }
+
+    function showGuideDetailsForm() {
+        if (!currentGuide) return;
+        const lang = currentGuide.current_lang || currentGuide.default_lang;
+        const details = currentGuide.details[lang] || { title: '', summary: '' };
+
+        const formHTML = `
+            <form>
+                <div class="form-group">
+                    <label for="title">Title (in ${lang.toUpperCase()})</label>
+                    <input type="text" name="title" value="${details.title}" required>
+                </div>
+                <div class="form-group">
+                    <label for="summary">Summary (in ${lang.toUpperCase()})</label>
+                    <textarea name="summary" rows="4">${details.summary}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select name="status" class="form-select">
+                        <option value="draft" ${currentGuide.status === 'draft' ? 'selected' : ''}>Draft</option>
+                        <option value="published" ${currentGuide.status === 'published' ? 'selected' : ''}>Published</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-modern">Save Details</button>
+                    <button type="button" id="delete-guide-btn" class="btn-modern btn-modern-danger">Delete Guide</button>
+                </div>
+            </form>
+        `;
+
+        showFormModal('Edit Guide Details', formHTML, async (data) => {
+            // Update logic
+            const newDetails = { ...currentGuide.details };
+            newDetails[lang] = { title: data.title, summary: data.summary };
+
+            const { data: responseData, error } = await supabase.from('guides')
+                .update({ details: newDetails, status: data.status })
+                .eq('id', currentGuide.id)
+                .select();
+
+            if (error) {
+                alert(`Error updating guide: ${error.message}`);
+                return false;
+            }
+            if (!responseData || responseData.length === 0) {
+                alert("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                return false;
+            }
+
+            alert('Guide details saved!');
+            await loadGuide(currentGuide.slug); // Reload to see changes
+            return true;
+        });
+
+        // Add event listener for the delete button *after* the modal is shown
+        document.getElementById('delete-guide-btn').addEventListener('click', deleteGuide);
+    }
+
+    async function deleteGuide() {
+        if (!currentGuide) return;
+        if (!confirm(`Are you absolutely sure you want to delete the guide "${currentGuide.title}"? This action cannot be undone.`)) return;
+
+        const { error } = await supabase.from('guides').delete().eq('id', currentGuide.id);
+
+        if (error) {
+            alert(`Error deleting guide: ${error.message}`);
+        } else {
+            alert('Guide deleted successfully.');
+            window.location.reload(); // Reload the app to go back to the guide list
+        }
     }
 
     function exportForTranslation() {
         if (!currentGuide) return;
 
-        const langToExport = currentGuide.default_lang;
+        const langToExport = currentGuide.current_lang || currentGuide.default_lang;
         const translationTemplate = {
             guide: {
                 title: currentGuide.details[langToExport]?.title || '',
@@ -681,7 +907,416 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
 
-        downloadJson(translationTemplate, `${currentGuide.slug}-translations.json`);
+        downloadJson(translationTemplate, `${currentGuide.slug}-${langToExport}-translation.json`);
+    }
+
+    async function importGuides(json) {
+        let parsedData;
+        try {
+            // Clean the JSON string to remove common errors like trailing commas
+            const cleanedJson = json.replace(/,\s*([\]}])/g, '$1');
+            parsedData = JSON.parse(cleanedJson);
+            if (!parsedData.guides || !Array.isArray(parsedData.guides)) {
+                throw new Error("Invalid JSON format: 'guides' array not found.");
+            }
+        } catch (error) {
+            alert(`Error reading file: ${error.message}`);
+            return;
+        }
+
+        showFormModal('Importing...', '<div class="loader"></div>', () => {});
+
+        try {
+            for (const guide of parsedData.guides) {
+                const { pois, ...aiGuideData } = guide;
+
+                // Sanitize and construct the guide object to ensure all required fields are present
+                const cleanGuideData = {
+                    slug: aiGuideData.slug,
+                    details: aiGuideData.details,
+                    status: aiGuideData.status || 'draft',
+                    default_lang: aiGuideData.default_lang || 'en',
+                    available_langs: aiGuideData.available_langs || ['en'],
+                    author_id: currentUser.id, // Always set the importer as the author
+                    cover_url: aiGuideData.cover_url,
+                    initial_lat: aiGuideData.initial_lat,
+                    initial_lon: aiGuideData.initial_lon,
+                    initial_zoom: aiGuideData.initial_zoom
+                };
+
+                // 1. Upsert the guide itself, using slug as the conflict target
+                const { data: upsertedGuide, error: guideError } = await supabase
+                    .from('guides')
+                    .upsert(cleanGuideData, { onConflict: 'slug' })
+                    .select('id')
+                    .single();
+
+                if (guideError || !upsertedGuide) throw new Error(`Failed to import guide "${guideData.slug}": ${guideError?.message}`);
+
+                const guideId = upsertedGuide.id;
+
+                // 2. Clear all old POIs for this guide to ensure a clean import
+                const { error: deleteError } = await supabase.from('guide_poi').delete().eq('guide_id', guideId);
+                if (deleteError) throw new Error(`Failed to clear old POIs for guide "${guideData.slug}": ${deleteError.message}`);
+
+                // 3. Insert the new POIs
+                if (pois && pois.length > 0) {
+                    const newPois = pois.map(p => {
+                        delete p.id; // Let DB handle the ID
+                        p.guide_id = guideId; // Assign the correct new guide ID
+                        return p;
+                    });
+                    const { error: poiError } = await supabase.from('guide_poi').insert(newPois);
+                    if (poiError) throw new Error(`Failed to import POIs for guide "${guideData.slug}": ${poiError.message}`);
+                }
+            }
+
+            hideFormModal();
+            alert('Import complete! Reloading to see changes.');
+            window.location.reload();
+
+        } catch (error) {
+            hideFormModal();
+            alert(`An error occurred during import: ${error.message}`);
+        }
+    }
+
+    async function exportAllGuides() {
+        showFormModal('Exporting...', '<div class="loader"></div>', () => {});
+        try {
+            const { data: guides, error: guidesError } = await supabase.from('guides').select('*');
+            if (guidesError) throw guidesError;
+
+            const { data: pois, error: poisError } = await supabase.from('guide_poi').select('*');
+            if (poisError) throw poisError;
+
+            const poisByGuideId = {};
+            pois.forEach(p => {
+                if (!poisByGuideId[p.guide_id]) {
+                    poisByGuideId[p.guide_id] = [];
+                }
+                poisByGuideId[p.guide_id].push(p);
+            });
+
+            const exportData = guides.map(g => ({
+                ...g,
+                pois: poisByGuideId[g.id] || []
+            }));
+
+            downloadJson({ guides: exportData }, 'waywhispery-backup.json');
+            hideFormModal();
+        } catch (error) {
+            hideFormModal();
+            alert(`Failed to export guides: ${error.message}`);
+        }
+    }
+
+    function showGenerateGuideModal() {
+        const formHTML = `
+            <form>
+                <div class="form-group">
+                    <label for="topic">What topic would you like to generate a guide for?</label>
+                    <input type="text" name="topic" placeholder="e.g., A walking tour of the Roman Forum" required maxlength="50">
+                </div>
+                <p class="text-muted small">The AI will generate a title, summary, and a list of 10-15 POIs with coordinates. This may take a moment.</p>
+                <button type="submit" class="btn-modern">Generate Guide</button>
+            </form>
+        `;
+        showFormModal('Generate Guide with AI', formHTML, (data) => {
+            runGuideGeneration(data.topic);
+            return true;
+        });
+    }
+
+    async function runGuideGeneration(topic) {
+        showFormModal('Generating Guide...', '<div class="loader"></div>', () => {});
+
+        const prompt = `
+            You are an expert tour guide creator. Your task is to generate a complete tour guide on a given topic.
+            The output must be a single, valid JSON object and nothing else. Do not include any text, explanation, or markdown fences before or after the JSON object.
+
+            The topic is: "${topic}".
+
+            The JSON object must follow this exact structure:
+            {
+              "guides": [
+                {
+                  "slug": "a-unique-slug-for-the-guide-in-english",
+                  "default_lang": "en",
+                  "available_langs": ["en"],
+                  "status": "draft",
+                  "details": { "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." } },
+                  "pois": [
+                    { "order": 1, "texts": { "en": { "title": "POI 1 Title", "description": "POI 1 Description." } }, "lat": 41.8925, "lon": 12.4853 },
+                    { "order": 2, "texts": { "en": { "title": "POI 2 Title", "description": "POI 2 Description." } }, "lat": 41.8922, "lon": 12.4858 }
+                  ]
+                }
+              ]
+            }
+
+            Please generate a guide with 10 to 15 POIs. The POIs should be in a logical walking order.
+            You MUST invent plausible latitude and longitude coordinates for each POI, centered around the main topic location.
+            The slug should be a URL-friendly version of the English title. The language for all text content must be English.
+        `;
+
+        try {
+            const payload = {
+                model: 'openai',
+                messages: [{ role: 'user', content: prompt }]
+            };
+
+            const response = await fetch('https://text.pollinations.ai/openai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+
+            const result = await response.json();
+            let jsonResponse = result.choices[0].message.content;
+
+            // Clean the response to ensure it's just a JSON object
+            const jsonMatch = jsonResponse.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error("AI did not return a valid JSON object.");
+            }
+            jsonResponse = jsonMatch[0];
+
+            // Show the generated JSON in a preview modal
+            hideFormModal(); // Hide the "generating" loader
+            showJsonPreviewModal(jsonResponse);
+
+        } catch (error) {
+            hideFormModal();
+            alert(`AI guide generation failed: ${error.message}`);
+            console.error(error);
+        }
+    }
+
+    function showJsonPreviewModal(jsonString) {
+        let prettyJson;
+        try {
+            // Try to format the JSON for better readability.
+            prettyJson = JSON.stringify(JSON.parse(jsonString), null, 2);
+        } catch (e) {
+            // If it's invalid, show the raw string.
+            prettyJson = jsonString;
+        }
+
+        const previewHTML = `
+            <p>The AI-generated JSON is below. It may have errors. You can edit it here before importing.</p>
+            <details>
+                <summary>Show/Hide Generated JSON</summary>
+                <textarea id="json-editor-textarea" class="json-preview">${prettyJson}</textarea>
+            </details>
+            <div id="json-validation-status" class="validation-status"></div>
+            <div class="form-actions">
+                <button id="validate-json-btn" class="btn-modern btn-modern-secondary">Validate JSON</button>
+                <button id="import-from-preview-btn" class="btn-modern btn-modern-primary">Import Guide</button>
+                <button id="export-from-preview-btn" class="btn-modern btn-modern-secondary">Export JSON</button>
+            </div>
+        `;
+
+        showFormModal('AI Generation Result', previewHTML, () => {});
+
+        // Manually add event listeners for our custom buttons
+        document.getElementById('validate-json-btn').addEventListener('click', () => {
+            const editedJson = document.getElementById('json-editor-textarea').value;
+            const statusDiv = document.getElementById('json-validation-status');
+            try {
+                JSON.parse(editedJson);
+                statusDiv.textContent = 'JSON is valid!';
+                statusDiv.style.color = 'green';
+            } catch (error) {
+                statusDiv.textContent = `Invalid JSON: ${error.message}`;
+                statusDiv.style.color = 'red';
+            }
+        });
+        document.getElementById('import-from-preview-btn').addEventListener('click', () => {
+            const editedJson = document.getElementById('json-editor-textarea').value;
+            importGuides(editedJson);
+        });
+        document.getElementById('export-from-preview-btn').addEventListener('click', () => {
+            const editedJson = document.getElementById('json-editor-textarea').value;
+            try {
+                downloadJson(JSON.parse(editedJson), 'ai-generated-guide.json');
+            } catch (error) {
+                alert(`Cannot export invalid JSON. Please fix the errors first.\nError: ${error.message}`);
+            }
+        });
+    }
+
+
+    function showAutoTranslateModal() {
+        const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+        const availableLangs = new Set(currentGuide.available_langs);
+        let optionsHTML = '';
+        for (const [code, name] of Object.entries(langMap)) {
+            if (!availableLangs.has(code)) {
+                optionsHTML += `<option value="${code}">${name}</option>`;
+            }
+        }
+
+        if (!optionsHTML) {
+            alert("This guide has already been translated into all supported languages.");
+            return;
+        }
+
+        const formHTML = `
+            <p>Translate from <strong>${currentGuide.default_lang.toUpperCase()}</strong> to:</p>
+            <form>
+                <div class="form-group">
+                    <select name="targetLang" class="form-select">${optionsHTML}</select>
+                </div>
+                <button type="submit" class="btn-modern">Translate</button>
+            </form>
+            <p class="text-muted small">Note: Auto-translation is a tool. Please review results before saving.</p>
+        `;
+        showFormModal('Auto-translate Guide', formHTML, (data) => {
+            runAutoTranslation(data.targetLang);
+            return true;
+        });
+    }
+
+    async function runAutoTranslation(targetLang) {
+        if (!currentGuide) return;
+        const sourceLang = currentGuide.default_lang;
+        const translatedData = { guide: {}, pois: {} };
+        const textToTranslate = [];
+
+        // Gather all text
+        const guideDetails = currentGuide.details[sourceLang] || {};
+        textToTranslate.push(guideDetails.title || '');
+        textToTranslate.push(guideDetails.summary || '');
+        pois.forEach(poi => {
+            const poiTexts = poi.texts[sourceLang] || {};
+            textToTranslate.push(poiTexts.title || '');
+            textToTranslate.push(poiTexts.description || '');
+        });
+
+        // Show loader
+        showFormModal('Translating...', '<div class="loader"></div>', () => {});
+
+        try {
+            const translations = await Promise.all(textToTranslate.map(text =>
+                fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`)
+                .then(res => res.json())
+                .then(data => data.responseData.translatedText)
+            ));
+
+            // Reconstruct the data
+            translatedData.guide.title = translations.shift();
+            translatedData.guide.summary = translations.shift();
+            pois.forEach(poi => {
+                translatedData.pois[poi.id] = {
+                    title: translations.shift(),
+                    description: translations.shift()
+                };
+            });
+
+            // Instead of applying, prompt for duplication details
+            hideFormModal();
+            promptForDuplicationDetails(translatedData, targetLang);
+
+        } catch (error) {
+            hideFormModal();
+            alert(`Translation failed: ${error.message}`);
+        }
+    }
+
+    function promptForDuplicationDetails(translatedData, targetLang) {
+        const suggestedSlug = `${currentGuide.slug}-${targetLang}`;
+        const formHTML = `
+            <p>Please confirm the details for the new, duplicated guide in <strong>${targetLang.toUpperCase()}</strong>.</p>
+            <form>
+                <div class="form-group">
+                    <label for="title">New Guide Title</label>
+                    <input type="text" name="title" value="${translatedData.guide.title}" required>
+                </div>
+                <div class="form-group">
+                    <label for="slug">New Guide Slug (URL)</label>
+                    <input type="text" name="slug" value="${suggestedSlug}" required pattern="[a-z0-9-]+">
+                </div>
+                <button type="submit" class="btn-modern">Create Duplicated Guide</button>
+            </form>
+        `;
+
+        showFormModal('Confirm New Guide Details', formHTML, (data) => {
+            createDuplicateGuide(data, translatedData, targetLang);
+            return true;
+        });
+    }
+
+    async function createDuplicateGuide(details, translatedData, targetLang) {
+        showFormModal('Duplicating Guide...', '<div class="loader"></div>', () => {});
+
+        try {
+            // 1. Create the new guide entry
+            const newGuideObject = {
+                slug: details.slug,
+                details: {
+                    [targetLang]: {
+                        title: details.title,
+                        summary: translatedData.guide.summary
+                    }
+                },
+                default_lang: targetLang,
+                available_langs: [targetLang],
+                status: 'draft', // New duplicated guides are drafts by default
+                author_id: currentUser.id,
+                initial_lat: currentGuide.initial_lat,
+                initial_lon: currentGuide.initial_lon,
+                initial_zoom: currentGuide.initial_zoom,
+                cover_url: currentGuide.cover_url
+            };
+
+            const { data: newGuideData, error: guideError } = await supabase
+                .from('guides')
+                .insert(newGuideObject)
+                .select('id')
+                .single();
+
+            if (guideError || !newGuideData) {
+                throw new Error(`Failed to create new guide: ${guideError?.message || 'No data returned.'}`);
+            }
+
+            const newGuideId = newGuideData.id;
+
+            // 2. Prepare the new POIs (guide_sections)
+            const newSections = pois.map((originalPoi, index) => {
+                return {
+                    guide_id: newGuideId,
+                    order: originalPoi.order,
+                    lat: originalPoi.lat,
+                    lon: originalPoi.lon,
+                    texts: {
+                        [targetLang]: {
+                            title: translatedData.pois[originalPoi.id]?.title || '',
+                            description: translatedData.pois[originalPoi.id]?.description || ''
+                        }
+                    }
+                };
+            });
+
+            // 3. Bulk insert the new POIs
+            const { error: sectionsError } = await supabase.from('guide_poi').insert(newSections);
+
+            if (sectionsError) {
+                // Note: This could leave an orphaned guide. A more robust solution might use a transaction or delete the guide.
+                throw new Error(`Failed to create POIs for the new guide: ${sectionsError.message}`);
+            }
+
+            hideFormModal();
+            alert(`Successfully created new guide: "${details.title}". It is saved as a draft.`);
+            window.location.reload(); // Reload to see the new guide in the list
+
+        } catch (error) {
+            hideFormModal();
+            alert(`An error occurred during duplication: ${error.message}`);
+        }
     }
 
     function downloadJson(data, filename) {
@@ -705,13 +1340,15 @@ document.addEventListener('DOMContentLoaded', () => {
         formModalContent.innerHTML = formHTML;
         formModal.classList.remove('hidden');
         const form = formModalContent.querySelector('form');
-        function handleSubmit(e) {
-            e.preventDefault();
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-            if (submitCallback(data)) { hideFormModal(); }
+        if (form) {
+            function handleSubmit(e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                if (submitCallback(data)) { hideFormModal(); }
+            }
+            form.addEventListener('submit', handleSubmit);
         }
-        form.addEventListener('submit', handleSubmit);
         formModalCloseBtn.onclick = () => hideFormModal();
     }
 
@@ -724,41 +1361,83 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initializer
     // -----------------------------------------------------------------------------
     async function init() {
-        console.log("INIT started...");  
         const splashScreen = document.getElementById('splash-screen');
-        const splashCloseBtn = document.getElementById('splash-close-btn');
+        const splashLoader = document.getElementById('splash-loader');
+        const languageFlags = document.querySelectorAll('.flag-icon');
+        const splashLoginBtn = document.getElementById('splash-login-btn');
 
-        const hideSplash = () => {
-            splashScreen.classList.add('hidden');
-            splashScreen.style.display = 'none'; // refuerzo
-        };
-        if (splashCloseBtn) {
-            splashCloseBtn.addEventListener('click', hideSplash);
+        function updateLangButton(lang) {
+            langBtn.innerHTML = `<img src="https://flagcdn.com/w20/${lang}.png" alt="${lang}">`;
         }
 
-        try {
-            initializeMap();
-            setupEventListeners();
+        function populateLangMenu() {
+            const langMenu = document.getElementById('lang-menu');
+            const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+            langMenu.innerHTML = ''; // Clear previous options
+            for (const [code, name] of Object.entries(langMap)) {
+                const langItem = document.createElement('button');
+                langItem.className = 'logout-btn'; // Re-use style
+                langItem.innerHTML = `<img src="https://flagcdn.com/w20/${code}.png" alt="${name}" style="margin-right: 10px;"> ${name}`;
+                langItem.addEventListener('click', () => {
+                    startApp(code);
+                    langMenu.classList.remove('visible');
+                });
+                langMenu.appendChild(langItem);
+            }
+        }
 
-            supabase.auth.onAuthStateChange(async (event, session) => {
+        const startApp = async (lang) => {
+            selectedLanguage = lang;
+            updateLangButton(lang);
+            splashLoader.classList.remove('hidden');
+
+            // This is a full restart, so we re-fetch guides.
+            // A lighter implementation might just call fetchAndDisplayGuides.
+            try {
+                // Only setup event listeners once.
+                if(!map) {
+                    initializeMap();
+                    setupEventListeners();
+                    populateLangMenu();
+                }
+
+                // Set up auth listeners first
+                supabase.auth.onAuthStateChange(async (event, session) => {
+                    currentUser = session?.user || null;
+                    userProfile = currentUser ? await getProfile(currentUser.id) : null;
+                    updateUIforAuth();
+                });
+
+                // Get initial session
+                const { data: { session } } = await supabase.auth.getSession();
                 currentUser = session?.user || null;
                 userProfile = currentUser ? await getProfile(currentUser.id) : null;
                 updateUIforAuth();
+                updateSplashAuthUI();
+
+                // Fetch content
+                await fetchAndDisplayGuides();
+                updateMapView();
+
+                // Hide splash screen after loading is complete
+                splashScreen.classList.add('hidden');
+
+            } catch (error) {
+                console.error("Error during initialization:", error);
+                alert("An error occurred while loading the application. Please try refreshing the page.");
+                splashLoader.classList.add('hidden'); // Hide loader on error
+            }
+        };
+
+        languageFlags.forEach(flag => {
+            flag.addEventListener('click', () => {
+                const lang = flag.dataset.lang;
+                startApp(lang);
             });
+        });
 
-            const { data: { session } } = await supabase.auth.getSession();
-            currentUser = session?.user || null;
-            userProfile = currentUser ? await getProfile(currentUser.id) : null;
-            updateUIforAuth();
-
-            await fetchAndDisplayGuides();
-            updateMapView(); // Initial update
-        } catch (error) {
-            console.error("Error during initialization:", error);
-            alert("An error occurred while loading the application. Please try refreshing the page.");
-        } finally {
-            // Always hide splash screen after init, regardless of success or failure
-            setTimeout(hideSplash, 500); // Give a small delay for content to render
+        if (splashLoginBtn) {
+            splashLoginBtn.addEventListener('click', loginWithGoogle);
         }
     }
 

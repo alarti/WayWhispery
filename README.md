@@ -79,15 +79,14 @@ This table contains the main information for each guide.
 - `created_at` (timestamptz): The timestamp of when the guide was created.
 - `updated_at` (timestamptz): The timestamp of the last guide update.
 
-### `guide_sections`
+### `guide_poi`
 
-This table stores the content sections of a guide in order. These also serve as the Points of Interest (POIs) on the map.
+This table stores the Points of Interest (POIs) for a guide, in order.
 
-- `id` (uuid, primary key): A unique identifier for the section.
-- `guide_id` (uuid): References the `id` of the guide this section belongs to.
-- `order` (integer, default: 0): The order in which the section appears in the guide.
-- `title` (text): The title of the section/POI.
-- `body_md` (text): The content of the section in Markdown format.
+- `id` (uuid, primary key): A unique identifier for the POI.
+- `guide_id` (uuid): References the `id` of the guide this POI belongs to.
+- `order` (integer, default: 0): The order in which the POI appears in the guide.
+- `texts` (jsonb): A JSON object containing the title and description in multiple languages.
 - `lat` (double precision): The latitude of the POI.
 - `lon` (double precision): The longitude of the POI.
 

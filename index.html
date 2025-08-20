@@ -19,28 +19,53 @@
 </head>
 <body>
     <!-- Splash Screen -->
-    <div id="splash-screen" class="modal-overlay">
-        <div class="modal-content text-center">
-            <img src="assets/icons/waywispery-icon.jpeg" alt="WayWhispery Logo" class="splash-logo">
-            <h1>WayWhispery</h1>
-            <p class="splash-marketing">Your interactive guide to the world.</p>
-            <hr>
-            <div class="splash-details">
-                <p><strong>Author:</strong> Alberto Arce (Arcasoft)</p>
-                <p><strong>Date:</strong> 2025.08</p>
-                <p><strong>Technology:</strong> Vanilla JS, Supabase, Leaflet</p>
+<div id="splash-screen" class="modal-overlay">
+    <div class="modal-content text-center">
+        <img src="assets/icons/waywispery-icon.jpeg" alt="WayWhispery Logo" class="splash-logo">
+        <h1>WayWhispery</h1>
+        <p class="splash-marketing">Your interactive guide to the world.</p>
+        <hr>
+
+        <!-- Language Selector -->
+        <div id="language-selector-container">
+            <p><strong>Select your language to begin:</strong></p>
+            <div class="flags-container">
+                <img src="https://flagcdn.com/w40/es.png" alt="Español" class="flag-icon" data-lang="es" title="Español">
+                <img src="https://flagcdn.com/w40/gb.png" alt="English" class="flag-icon" data-lang="en" title="English">
+                <img src="https://flagcdn.com/w40/fr.png" alt="Français" class="flag-icon" data-lang="fr" title="Français">
+                <img src="https://flagcdn.com/w40/de.png" alt="Deutsch" class="flag-icon" data-lang="de" title="Deutsch">
+                <img src="https://flagcdn.com/w40/cn.png" alt="中文" class="flag-icon" data-lang="zh" title="中文">
             </div>
-            <div id="splash-loader" class="loader"></div>
-            <button id="splash-close-btn" class="btn-modern btn-modern-secondary" style="margin-top: 1rem;">Enter</button>
+        </div>
+        <div id="splash-loader" class="loader hidden"></div>
+
+        <!-- Auth & Support Container -->
+        <div class="splash-footer">
+            <div class="splash-auth-container dropdown-container">
+                <button id="splash-login-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-sign-in-alt"></i> Login</button>
+            </div>
+            <a href="https://buymeacoffee.com/albertoarce" target="_blank" class="bmac-button">
+                <img src="https://www.buymeacoffee.com/assets/img/guidelines/download-assets-sm-2.svg" alt="Buy Me a Coffee">
+            </a>
         </div>
     </div>
+</div>
 
     <div class="app-container">
         <!-- Activity Bar -->
         <div class="activity-bar">
+            <button id="logo-btn" class="activity-btn" title="Show Guides">
+                <img src="assets/icons/waywispery-icon.jpeg" alt="Logo" id="activity-bar-logo">
+            </button>
             <button id="activity-map-btn" class="activity-btn" title="Map Details"><i class="fas fa-map-marked-alt"></i></button>
             <div class="spacer"></div>
-            <div id="auth-container-activity">
+            <div id="lang-menu-container" class="dropdown-container">
+                <button id="lang-btn" class="activity-btn" title="Change Language"></button>
+                <div class="dropdown-menu" id="lang-menu">
+                    <!-- Language options will be injected here -->
+                </div>
+            </div>
+            <div id="auth-container-activity" class="dropdown-container">
                 <!-- Auth content will be injected here -->
             </div>
         </div>
@@ -49,7 +74,6 @@
         <div class="sidebar">
             <!-- Sidebar Header with Logo -->
             <div class="sidebar-header">
-                <img src="assets/icons/waywispery-icon.jpeg" alt="Logo" id="sidebar-logo">
                 <h3 id="sidebar-view-title">All Guides</h3>
                 <div id="sidebar-header-controls">
                     <!-- Create/Edit buttons will go here -->
@@ -71,10 +95,6 @@
                     </div>
                     <hr>
                     <div class="sidebar-controls">
-                        <div class="form-group">
-                            <label for="language-selector">Language</label>
-                            <select id="language-selector" class="form-select"></select>
-                        </div>
                         <div class="form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="live-mode-toggle">
                             <label class="form-check-label" for="live-mode-toggle">Live GPS Mode</label>
@@ -115,6 +135,8 @@
             </div>
         </div>
     </div>
+
+    <input type="file" id="import-guides-input" accept=".json" style="display: none;">
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/main.js"></script>

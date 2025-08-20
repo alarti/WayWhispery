@@ -324,6 +324,51 @@ html, body {
     100% { transform: rotate(360deg); }
 }
 
+.loader.hidden {
+    display: none;
+}
+
+/* New Splash Screen Styles */
+#language-selector-container {
+    margin: 1.5rem 0;
+}
+.flags-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+.flag-icon {
+    width: 40px;
+    height: auto;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 2px solid transparent;
+}
+.flag-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+.splash-footer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--ww-border-color);
+}
+.bmac-button img {
+    height: 40px;
+    width: auto;
+    border-radius: 8px;
+    transition: transform 0.2s;
+}
+.bmac-button:hover img {
+    transform: scale(1.05);
+}
+
 /* --- Map Overlays --- */
 #guide-text-overlay {
     position: absolute;
@@ -362,4 +407,129 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* User Profile Display */
+.user-profile-container {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between email and button */
+}
+
+.user-profile-container .user-email {
+    font-size: 0.9rem;
+    color: #f0f0f0; /* Light color to match other UI elements */
+    white-space: nowrap; /* Prevent wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Add ... if name is too long */
+    max-width: 150px; /* Adjust as needed */
+}
+
+/* Specific styling for the splash screen version */
+.splash-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.splash-auth-container {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+}
+
+.splash-footer .user-profile-container {
+    justify-content: center; /* Center items in the splash footer */
+}
+
+.splash-footer .user-email {
+    color: #333; /* Darker text for the light splash background */
+    max-width: 200px;
+}
+
+/* Dropdown Menus in Activity Bar */
+.dropdown-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.dropdown-menu {
+    display: none; /* Hidden by default */
+    position: absolute;
+    left: var(--activity-bar-width); /* Position next to the activity bar */
+    top: 0;
+    background-color: #f9f9f9;
+    min-width: 200px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1000;
+    border-radius: 5px;
+    padding: 10px;
+    text-align: left;
+}
+
+.dropdown-menu.visible {
+    display: block;
+}
+
+.dropdown-menu .user-email {
+    color: #333;
+    font-weight: bold;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 8px;
+    display: block;
+    white-space: normal;
+}
+
+.dropdown-menu .logout-btn {
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    color: #333;
+    cursor: pointer;
+}
+
+.dropdown-menu .logout-btn:hover {
+    background-color: #f1f1f1;
+}
+
+/* Splash screen specific positioning */
+.splash-footer .dropdown-menu {
+    top: auto;
+    bottom: 50px; /* Position above the splash footer button */
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* JSON Preview in Modal */
+.json-preview {
+    width: 100%;
+    min-height: 300px;
+    max-height: 40vh;
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    padding: 15px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+}
+
+.validation-status {
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+#activity-bar-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    object-fit: cover;
 }
