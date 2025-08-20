@@ -3,7 +3,6 @@
  * Author: Alberto Arce (Original)
  */
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { PollinationsAI } from './vendor/g4f-client.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -13,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const SUPABASE_URL = 'https://whfcesalellvnrbdcsbb.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndoZmNlc2FsZWxsdm5yYmRjc2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNTY0NDMsImV4cCI6MjA3MDkzMjQ0M30.wjzU9y1pudSctnLxaIIAfG8FKbMalLbKU4rto99vP9E';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const g4fClient = new PollinationsAI();
 
     // -----------------------------------------------------------------------------
     // DOM Elements
@@ -1062,12 +1060,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         try {
-            const result = await g4fClient.chat.completions.create({
-                model: 'gpt-4.1', // A capable model is needed for this task
-                messages: [{ role: 'user', content: prompt }]
+            const response = await fetch('https://text.pollinations.ai/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: prompt
             });
 
-            let jsonResponse = result.choices[0].message.content;
+            if (!response.ok) {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+
+            let jsonResponse = await response.text();
 
             // Clean the response to ensure it's just a JSON object
             const jsonMatch = jsonResponse.match(/\{[\s\S]*\}/);
