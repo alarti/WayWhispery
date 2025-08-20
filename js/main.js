@@ -1060,17 +1060,23 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         try {
-            const response = await fetch('https://text.pollinations.ai/', {
+            const payload = {
+                model: 'gpt-4o-mini', // A capable model is needed for this task
+                messages: [{ role: 'user', content: prompt }]
+            };
+
+            const response = await fetch('https://text.pollinations.ai/openai', {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: prompt
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
                 throw new Error(`API request failed with status ${response.status}`);
             }
 
-            let jsonResponse = await response.text();
+            const result = await response.json();
+            let jsonResponse = result.choices[0].message.content;
 
             // Clean the response to ensure it's just a JSON object
             const jsonMatch = jsonResponse.match(/\{[\s\S]*\}/);
