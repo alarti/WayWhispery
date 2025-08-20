@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let currentGuide = null;
     let pois = [];
+    let allFetchedGuides = []; // To store guides for client-side filtering
     let tourRoute = [];
     let visitedPois = new Set();
     let breadcrumbPath = [];
@@ -98,6 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
         langBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             document.getElementById('lang-menu').classList.toggle('visible');
+        });
+
+        // Search listener
+        document.getElementById('guide-search-input').addEventListener('input', (e) => {
+            renderGuideList(e.target.value.toLowerCase());
         });
 
         // Modals
@@ -231,20 +237,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateMapView() {
         if (currentGuide) {
-            sidebarViewTitle.textContent = currentGuide.title;
+            // Rerender text content based on the current language
+            renderGuideText(currentGuide.current_lang);
             authorNameSpan.textContent = currentGuide.author?.email || 'Unknown';
             guideMetaContainer.classList.remove('hidden');
             renderPoiList();
             renderPois();
             drawTourRoute();
+            renderLanguageSwitcher(); // New function call
         } else {
             sidebarViewTitle.textContent = 'All Guides';
             authorNameSpan.textContent = '';
             guideMetaContainer.classList.add('hidden');
+            document.getElementById('guide-language-switcher-container').classList.add('hidden');
             poiList.innerHTML = '';
         }
         updateHeaderControls();
         setMode('view');
+    }
+
+    function switchGuideLanguage(newLang) {
+        if (!currentGuide || !currentGuide.available_langs.includes(newLang)) {
+            console.warn(`Language ${newLang} is not available for this guide.`);
+            return;
+        }
+        currentGuide.current_lang = newLang;
+
+        // Update utterance language for TTS
+        const ttsLangMap = { en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN' };
+        utterance.lang = ttsLangMap[newLang] || 'en-US';
+
+        // Re-render all text-based UI components
+        updateMapView();
+    }
+
+    function renderGuideText(langCode) {
+        if (!currentGuide) return;
+
+        let guideDetailsObj = currentGuide.details;
+        if (typeof guideDetailsObj === 'string') {
+            try { guideDetailsObj = JSON.parse(guideDetailsObj); } catch (e) { guideDetailsObj = {}; }
+        }
+        const guideDetails = guideDetailsObj?.[langCode] || guideDetailsObj?.[currentGuide.default_lang] || {};
+        currentGuide.title = guideDetails.title || 'Untitled Guide';
+        currentGuide.summary = guideDetails.summary || '';
+        sidebarViewTitle.textContent = currentGuide.title;
+
+        // Process POI texts for the selected language
+        pois.forEach(poi => {
+            let poiTextsObj = poi.texts;
+            if (typeof poiTextsObj === 'string') {
+                try { poiTextsObj = JSON.parse(poiTextsObj); } catch (e) { poiTextsObj = {}; }
+            }
+            const poiTexts = poiTextsObj?.[langCode] || poiTextsObj?.[currentGuide.default_lang] || {};
+            poi.name = poiTexts.title || 'Untitled POI';
+            poi.description = poiTexts.description || '';
+        });
+    }
+
+    function renderLanguageSwitcher() {
+        const container = document.getElementById('guide-language-switcher-container');
+        const select = document.getElementById('guide-language-select');
+        if (!currentGuide || !currentGuide.available_langs) {
+            container.classList.add('hidden');
+            return;
+        }
+
+        container.classList.remove('hidden');
+        select.innerHTML = '';
+        const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+
+        currentGuide.available_langs.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang;
+            option.textContent = langMap[lang] || lang;
+            if (lang === currentGuide.current_lang) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+
+        select.onchange = () => switchGuideLanguage(select.value);
     }
 
     // -----------------------------------------------------------------------------
@@ -422,40 +495,23 @@ document.addEventListener('DOMContentLoaded', () => {
         return error ? null : data;
     }
 
-    async function fetchAndDisplayGuides() {
-        if (!selectedLanguage) {
-            guideCatalogList.innerHTML = '<p>Select a language from the splash screen to see available guides.</p>';
-            return;
-        }
+    function renderGuideList(searchTerm = '') {
+        const guidesToRender = searchTerm
+            ? allFetchedGuides.filter(guide => {
+                const guideDetails = guide.details?.[selectedLanguage] || guide.details?.[guide.default_lang] || { title: '', summary: '' };
+                const title = guideDetails.title || '';
+                const summary = guideDetails.summary || '';
+                return title.toLowerCase().includes(searchTerm) || summary.toLowerCase().includes(searchTerm);
+            })
+            : allFetchedGuides;
 
-        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
-        // Security Note: Supabase client library uses parameterized queries, preventing SQL injection.
-        // The RLS policies defined in the database provide row-level access control.
-        let query = supabase.from('guides')
-            .select('slug, details, default_lang, available_langs')
-            .contains('available_langs', `{${selectedLanguage}}`); // Filter by selected language
-
-        // Editors can see their own drafts, everyone can see published guides
-        if (isEditor && currentUser) {
-            query = query.or(`author_id.eq.${currentUser.id},status.eq.published`);
-        } else {
-            query = query.eq('status', 'published');
-        }
-
-        const { data: guides, error } = await query;
-
-        if (error) {
-            console.error("Error fetching guides:", error);
-            guideCatalogList.innerHTML = `<p>Error loading guides.</p>`;
-            return;
-        }
-        if (!guides || guides.length === 0) {
-            guideCatalogList.innerHTML = `<p>No guides found for the selected language.</p>`;
+        if (guidesToRender.length === 0) {
+            guideCatalogList.innerHTML = `<p>No guides found.</p>`;
             return;
         }
 
         guideCatalogList.innerHTML = '';
-        guides.forEach(guide => {
+        guidesToRender.forEach(guide => {
             const card = document.createElement('div');
             card.className = 'card';
 
@@ -469,9 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Use the selected language for display, fallback to default, then first available
             const guideDetails = details_obj?.[selectedLanguage] || details_obj?.[guide.default_lang] || details_obj?.[Object.keys(details_obj || {})[0]] || { title: 'Untitled', summary: '' };
-
             const title = guideDetails.title;
             const summary = guideDetails.summary;
 
@@ -479,6 +533,38 @@ document.addEventListener('DOMContentLoaded', () => {
             card.addEventListener('click', () => loadGuide(guide.slug));
             guideCatalogList.appendChild(card);
         });
+    }
+
+    async function fetchAndDisplayGuides() {
+        if (!selectedLanguage) {
+            guideCatalogList.innerHTML = '<p>Select a language from the splash screen to see available guides.</p>';
+            return;
+        }
+
+        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+        let query = supabase.from('guides')
+            .select('slug, details, default_lang, available_langs, rating')
+            .contains('available_langs', `{${selectedLanguage}}`)
+            .order('rating', { ascending: false });
+
+        if (isEditor && currentUser) {
+            query = query.or(`author_id.eq.${currentUser.id},status.eq.published`);
+        } else {
+            query = query.eq('status', 'published');
+        }
+
+        const { data: guides, error } = await query;
+
+        if (error) {
+            console.error("Error fetching guides:", error);
+            guideCatalogList.innerHTML = `<p>Error loading guides.</p>`;
+            allFetchedGuides = [];
+            return;
+        }
+
+        allFetchedGuides = guides || [];
+        document.getElementById('guide-search-input').value = ''; // Clear search
+        renderGuideList(); // Render the full list
     }
 
     async function loadGuide(slug) {
@@ -496,32 +582,16 @@ document.addEventListener('DOMContentLoaded', () => {
         pois = sectionsData;
         tourRoute = pois.map(p => p.id);
 
-        // Process guide texts for the guide's default language
-        const langCode = currentGuide.default_lang;
-        currentGuide.current_lang = langCode; // Set current lang for consistency
-
-        let guideDetailsObj = currentGuide.details;
-        if (typeof guideDetailsObj === 'string') {
-            try { guideDetailsObj = JSON.parse(guideDetailsObj); } catch (e) { guideDetailsObj = {}; }
+        // Set the initial language for the guide. Prioritize the user's globally selected language.
+        if (selectedLanguage && currentGuide.available_langs.includes(selectedLanguage)) {
+            currentGuide.current_lang = selectedLanguage;
+        } else {
+            currentGuide.current_lang = currentGuide.default_lang;
         }
-        const guideDetails = guideDetailsObj?.[langCode] || {};
-        currentGuide.title = guideDetails.title || 'Untitled Guide';
-        currentGuide.summary = guideDetails.summary || '';
-
-        // Process POI texts for the guide's default language
-        pois.forEach(poi => {
-            let poiTextsObj = poi.texts;
-            if (typeof poiTextsObj === 'string') {
-                try { poiTextsObj = JSON.parse(poiTextsObj); } catch (e) { poiTextsObj = {}; }
-            }
-            const poiTexts = poiTextsObj?.[langCode] || {};
-            poi.name = poiTexts.title || 'Untitled POI';
-            poi.description = poiTexts.description || '';
-        });
 
         // Update utterance language for TTS
         const ttsLangMap = { en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', zh: 'zh-CN' };
-        utterance.lang = ttsLangMap[langCode] || 'en-US';
+        utterance.lang = ttsLangMap[currentGuide.current_lang] || 'en-US';
 
         map.setView([currentGuide.initial_lat, currentGuide.initial_lon], currentGuide.initial_zoom);
         updateMapView();
@@ -1032,23 +1102,40 @@ document.addEventListener('DOMContentLoaded', () => {
         showFormModal('Generating Guide...', '<div class="loader"></div>', () => {});
 
         const prompt = `
-            You are an expert tour guide creator. Your task is to generate a complete tour guide on a given topic.
+            You are an expert tour guide creator. Your task is to generate a complete tour guide on a given topic, translated into multiple languages.
             The output must be a single, valid JSON object and nothing else. Do not include any text, explanation, or markdown fences before or after the JSON object.
 
             The topic is: "${topic}".
 
-            The JSON object must follow this exact structure:
+            The JSON object must follow this exact structure. You MUST provide translations for all 5 languages: en, es, fr, de, zh.
+
             {
               "guides": [
                 {
                   "slug": "a-unique-slug-for-the-guide-in-english",
                   "default_lang": "en",
-                  "available_langs": ["en"],
+                  "available_langs": ["en", "es", "fr", "de", "zh"],
                   "status": "draft",
-                  "details": { "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." } },
+                  "details": {
+                    "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." },
+                    "es": { "title": "Título de la Guía en Español", "summary": "Un breve resumen de la guía, en español." },
+                    "fr": { "title": "Titre du Guide en Français", "summary": "Un bref résumé du guide, en français." },
+                    "de": { "title": "Titel des Leitfadens auf Deutsch", "summary": "Eine kurze Zusammenfassung des Leitfadens, auf Deutsch." },
+                    "zh": { "title": "中文指南标题", "summary": "中文指南的简要概述。" }
+                  },
                   "pois": [
-                    { "order": 1, "texts": { "en": { "title": "POI 1 Title", "description": "POI 1 Description." } }, "lat": 41.8925, "lon": 12.4853 },
-                    { "order": 2, "texts": { "en": { "title": "POI 2 Title", "description": "POI 2 Description." } }, "lat": 41.8922, "lon": 12.4858 }
+                    {
+                      "order": 1,
+                      "texts": {
+                        "en": { "title": "POI 1 Title", "description": "POI 1 Description." },
+                        "es": { "title": "Título del PDI 1", "description": "Descripción del PDI 1." },
+                        "fr": { "title": "Titre du POI 1", "description": "Description du POI 1." },
+                        "de": { "title": "Titel von POI 1", "description": "Beschreibung von POI 1." },
+                        "zh": { "title": "POI 1的标题", "description": "POI 1的描述。" }
+                      },
+                      "lat": 41.8925,
+                      "lon": 12.4853
+                    }
                   ]
                 }
               ]
@@ -1056,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             Please generate a guide with 10 to 15 POIs. The POIs should be in a logical walking order.
             You MUST invent plausible latitude and longitude coordinates for each POI, centered around the main topic location.
-            The slug should be a URL-friendly version of the English title. The language for all text content must be English.
+            The slug should be a URL-friendly version of the English title.
         `;
 
         try {
@@ -1379,8 +1466,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 langItem.className = 'logout-btn'; // Re-use style
                 langItem.innerHTML = `<img src="https://flagcdn.com/w20/${code}.png" alt="${name}" style="margin-right: 10px;"> ${name}`;
                 langItem.addEventListener('click', () => {
-                    startApp(code);
+                    // This now just updates the global language and refreshes the guide list
+                    selectedLanguage = code;
+                    updateLangButton(code);
+                    fetchAndDisplayGuides();
                     langMenu.classList.remove('visible');
+                    // If we are in the map view, switch back to the guides list
+                    if (sidebarMapView.classList.contains('active')) {
+                        switchSidebarView('guides');
+                    }
                 });
                 langMenu.appendChild(langItem);
             }
@@ -1391,33 +1485,32 @@ document.addEventListener('DOMContentLoaded', () => {
             updateLangButton(lang);
             splashLoader.classList.remove('hidden');
 
-            // This is a full restart, so we re-fetch guides.
-            // A lighter implementation might just call fetchAndDisplayGuides.
             try {
-                // Only setup event listeners once.
+                // This logic now only runs once on the first app start
                 if(!map) {
                     initializeMap();
                     setupEventListeners();
                     populateLangMenu();
-                }
 
-                // Set up auth listeners first
-                supabase.auth.onAuthStateChange(async (event, session) => {
+                    // Set up auth listeners once
+                    supabase.auth.onAuthStateChange(async (event, session) => {
+                        currentUser = session?.user || null;
+                        userProfile = currentUser ? await getProfile(currentUser.id) : null;
+                        updateUIforAuth();
+                        updateHeaderControls(); // Also update header controls on auth change
+                    });
+
+                    // Get initial session
+                    const { data: { session } } = await supabase.auth.getSession();
                     currentUser = session?.user || null;
                     userProfile = currentUser ? await getProfile(currentUser.id) : null;
                     updateUIforAuth();
-                });
+                    updateSplashAuthUI();
+                }
 
-                // Get initial session
-                const { data: { session } } = await supabase.auth.getSession();
-                currentUser = session?.user || null;
-                userProfile = currentUser ? await getProfile(currentUser.id) : null;
-                updateUIforAuth();
-                updateSplashAuthUI();
-
-                // Fetch content
+                // Fetch content for the first time
                 await fetchAndDisplayGuides();
-                updateMapView();
+                updateMapView(); // Initial map view setup
 
                 // Hide splash screen after loading is complete
                 splashScreen.classList.add('hidden');

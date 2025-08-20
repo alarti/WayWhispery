@@ -30,6 +30,8 @@ CREATE TABLE guides (
     cover_url TEXT,
     status TEXT CHECK (status IN ('draft', 'published')) DEFAULT 'draft' NOT NULL,
     author_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    rating INT DEFAULT 0,
+    rating_count INT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     initial_lat DOUBLE PRECISION,
@@ -194,7 +196,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, role)
-  VALUES (new.id, new.email, 'viewer');
+  VALUES (new.id, new.email, 'editor');
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

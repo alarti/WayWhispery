@@ -82,8 +82,13 @@
 
             <!-- Guides View -->
             <div id="sidebar-guides-view" class="sidebar-view active">
-                <div id="guide-catalog-list" class="sidebar-content">
-                    <!-- List of guides will be populated here -->
+                <div class="sidebar-content">
+                    <div class="search-container">
+                        <input type="text" id="guide-search-input" placeholder="Search guides..." class="form-control">
+                    </div>
+                    <div id="guide-catalog-list">
+                        <!-- List of guides will be populated here -->
+                    </div>
                 </div>
             </div>
 
@@ -92,6 +97,10 @@
                 <div class="sidebar-content">
                     <div id="guide-meta-container">
                         <p class="text-muted">by <span id="author-name"></span></p>
+                    </div>
+                    <div id="guide-language-switcher-container" class="hidden">
+                        <label for="guide-language-select">Guide Language:</label>
+                        <select id="guide-language-select" class="form-select"></select>
                     </div>
                     <hr>
                     <div class="sidebar-controls">
