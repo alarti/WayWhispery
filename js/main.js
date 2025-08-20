@@ -1018,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <form>
                 <div class="form-group">
                     <label for="topic">What topic would you like to generate a guide for?</label>
-                    <input type="text" name="topic" placeholder="e.g., A walking tour of the Roman Forum" required>
+                    <input type="text" name="topic" placeholder="e.g., A walking tour of the Roman Forum" required maxlength="50">
                 </div>
                 <p class="text-muted small">The AI will generate a title, summary, and a list of 10-15 POIs with coordinates. This may take a moment.</p>
                 <button type="submit" class="btn-modern">Generate Guide</button>
@@ -1088,18 +1088,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showJsonPreviewModal(jsonString) {
+        // Append closing characters as a suggestion, then attempt to format.
+        const suggestedJson = jsonString.trim() + '\n]}]}';
         let prettyJson;
         try {
-            // Try to format the JSON for better readability.
-            prettyJson = JSON.stringify(JSON.parse(jsonString), null, 2);
+            prettyJson = JSON.stringify(JSON.parse(suggestedJson), null, 2);
         } catch (e) {
-            // If it's invalid, show the raw string.
-            prettyJson = jsonString;
+            // If it's still invalid, just show the suggested (unformatted) string.
+            prettyJson = suggestedJson;
         }
 
         const previewHTML = `
-            <p>The AI has generated the following guide. You can edit the JSON below to fix any errors before importing.</p>
-            <textarea id="json-editor-textarea" class="json-preview">${prettyJson}</textarea>
+            <p>The AI-generated JSON is below. It may have errors. You can edit it here before importing.</p>
+            <details>
+                <summary>Show/Hide Generated JSON</summary>
+                <textarea id="json-editor-textarea" class="json-preview">${prettyJson}</textarea>
+            </details>
             <div id="json-validation-status" class="validation-status"></div>
             <div class="form-actions">
                 <button id="validate-json-btn" class="btn-modern btn-modern-secondary">Validate JSON</button>
