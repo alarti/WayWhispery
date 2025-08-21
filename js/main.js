@@ -125,13 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const exportAllBtn = document.getElementById('export-all-btn');
         if(exportAllBtn) exportAllBtn.title = uiStrings.exportAll[l];
 
-        const createBtn = document.getElementById('create-guide-btn');
-        if (createBtn) {
-            // This button has an icon and text, so we need to be careful
-            const icon = createBtn.querySelector('i');
-            createBtn.innerHTML = `${icon.outerHTML} ${uiStrings.newBtn[l]}`;
-            createBtn.title = uiStrings.newGuide[l];
-        }
+        // Re-render the global action buttons to apply new translations
+        renderGlobalActions();
     }
 
     // -----------------------------------------------------------------------------
@@ -251,6 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
             authContainer.innerHTML = `<button id="login-btn" class="activity-btn" title="Login"><i class="fas fa-sign-in-alt"></i></button>`;
             authContainer.querySelector('#login-btn').addEventListener('click', loginWithGoogle);
         }
+        renderGlobalActions();
         updateHeaderControls();
     }
 
@@ -654,38 +650,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Edit Mode & CRUD
     // -----------------------------------------------------------------------------
+    function renderGlobalActions() {
+        const container = document.getElementById('global-actions-container');
+        const hr = document.getElementById('global-actions-hr');
+        container.innerHTML = ''; // Clear previous buttons
+
+        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+        if (!isEditor) {
+            hr.classList.add('hidden');
+            return;
+        }
+
+        hr.classList.remove('hidden');
+        container.innerHTML = `
+            <button id="generate-guide-btn" class="btn-modern btn-modern-primary"><i class="fas fa-magic"></i> ${uiStrings.generateGuide[selectedLanguage] || 'Generate Guide with AI'}</button>
+            <button id="create-guide-btn" class="btn-modern"><i class="fas fa-plus"></i> ${uiStrings.newGuide[selectedLanguage] || 'New Guide'}</button>
+            <button id="import-guides-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-file-import"></i> ${uiStrings.importGuides[selectedLanguage] || 'Import Guides'}</button>
+            <button id="export-all-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-file-export"></i> ${uiStrings.exportAll[selectedLanguage] || 'Export All Guides'}</button>
+        `;
+        container.querySelector('#generate-guide-btn').onclick = showGenerateGuideModal;
+        container.querySelector('#create-guide-btn').onclick = createNewGuide;
+        container.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
+        container.querySelector('#export-all-btn').onclick = exportAllGuides;
+    }
+
     function updateHeaderControls() {
         sidebarHeaderControls.innerHTML = '';
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
         if (!isEditor) return;
 
-        const currentView = sidebarGuidesView.classList.contains('active') ? 'guides' : 'map';
-
-        if (currentView === 'guides') {
-            sidebarHeaderControls.innerHTML = `
-                <button id="generate-guide-btn" class="btn-modern btn-modern-sm btn-modern-primary" title="Generate Guide with AI"><i class="fas fa-magic"></i></button>
-                <button id="import-guides-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import Guides"><i class="fas fa-file-import"></i></button>
-                <button id="export-all-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export All Guides"><i class="fas fa-file-export"></i></button>
-                <button id="create-guide-btn" class="btn-modern btn-modern-sm" title="New Guide"><i class="fas fa-plus"></i> New</button>
-            `;
-            sidebarHeaderControls.querySelector('#generate-guide-btn').onclick = showGenerateGuideModal;
-            sidebarHeaderControls.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
-            sidebarHeaderControls.querySelector('#export-all-btn').onclick = exportAllGuides;
-            sidebarHeaderControls.querySelector('#create-guide-btn').onclick = createNewGuide;
-        } else if (currentView === 'map') {
-            if (currentGuide) {
-                setMode(isEditMode ? 'edit' : 'view'); // Re-render controls for map view
-            } else {
-                // No guide is loaded, but show the main creation buttons for editors
-                sidebarHeaderControls.innerHTML = `
-                    <button id="generate-guide-btn" class="btn-modern btn-modern-sm btn-modern-primary" title="Generate Guide with AI"><i class="fas fa-magic"></i></button>
-                    <button id="import-guides-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import Guides"><i class="fas fa-file-import"></i></button>
-                    <button id="create-guide-btn" class="btn-modern btn-modern-sm" title="New Guide"><i class="fas fa-plus"></i> New</button>
-                `;
-                sidebarHeaderControls.querySelector('#generate-guide-btn').onclick = showGenerateGuideModal;
-                sidebarHeaderControls.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
-                sidebarHeaderControls.querySelector('#create-guide-btn').onclick = createNewGuide;
-            }
+        // This function now ONLY handles controls for an ACTIVE guide.
+        if (currentGuide) {
+            setMode(isEditMode ? 'edit' : 'view'); // Re-render controls for map view
         }
     }
 
