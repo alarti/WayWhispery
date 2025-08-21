@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
         let query = supabase.from('guides')
-            .select('*, rating_count') // Select all columns + rating_count
+            .select('id, slug, details, default_lang, available_langs, rating, rating_count')
             .contains('available_langs', `{${selectedLanguage}}`)
             .order('rating', { ascending: false }); // Note: 'rating' is the sum, so this is a proxy for popularity
 
