@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     db.version(3).stores({
         guides: 'id, slug, *available_langs', // Primary key 'id', index on 'slug' and 'available_langs'
         guide_poi: 'id, guide_id', // Primary key 'id', index on 'guide_id'
-        mutations: '++id, error_count' // Auto-incrementing PK, index on error_count for querying failed mutations
+        mutations: '++id, createdAt, error_count' // Auto-incrementing PK, index on createdAt and error_count
     });
 
     // -----------------------------------------------------------------------------
@@ -669,6 +669,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             }
+
+            guideCatalogList.appendChild(card);
         });
     }
 
@@ -681,10 +683,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // Now reading from local Dexie DB
-            const guides = await db.guides
-                .where('available_langs')
-                .equals(selectedLanguage)
-                .toArray();
+            // Fetch all guides; filtering is handled by the rendering logic's language fallback.
+            const guides = await db.guides.toArray();
 
             // Note: The editor-specific view of drafts is lost in this simple offline model.
             // That would be part of a more complex sync strategy in Phase 2.
@@ -2011,6 +2011,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
+
+            // Refresh the guide list now that the sync is complete
+            await fetchAndDisplayGuides();
 
             // PHASE 2: Sync local mutations back to Supabase
             const localMutations = await db.mutations.orderBy('createdAt').toArray();
