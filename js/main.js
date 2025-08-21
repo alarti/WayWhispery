@@ -1108,7 +1108,8 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         showFormModal('Generate Guide with AI', formHTML, (data) => {
             runGuideGeneration(data.topic);
-            return true;
+            // By not returning true, we prevent the modal from closing.
+            // runGuideGeneration will replace its content with the loader.
         });
     }
 
