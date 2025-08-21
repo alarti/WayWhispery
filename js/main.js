@@ -669,6 +669,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             }
+
+            guideCatalogList.appendChild(card);
         });
     }
 
