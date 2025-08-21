@@ -681,10 +681,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // Now reading from local Dexie DB
-            const guides = await db.guides
-                .where('available_langs')
-                .equals(selectedLanguage)
-                .toArray();
+            // Fetch all guides; filtering is handled by the rendering logic's language fallback.
+            const guides = await db.guides.toArray();
 
             // Note: The editor-specific view of drafts is lost in this simple offline model.
             // That would be part of a more complex sync strategy in Phase 2.
