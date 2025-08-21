@@ -458,6 +458,17 @@ html, body {
     max-width: 200px;
 }
 
+.form-switch-container {
+    margin: 1rem 0;
+}
+
+.activity-bar-divider {
+    width: 60%;
+    border: none;
+    border-top: 1px solid var(--ww-border-color);
+    margin: 5px 0;
+}
+
 /* Dropdown Menus in Activity Bar */
 .dropdown-container {
     position: relative;

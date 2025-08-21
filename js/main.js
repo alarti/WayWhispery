@@ -91,12 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allGuides: { en: 'All Guides', es: 'Todas las Guías', fr: 'Tous les Guides', de: 'Alle Anleitungen', zh: '所有指南' },
         guideDetails: { en: 'Guide Details', es: 'Detalles de la Guía', fr: 'Détails du Guide', de: 'Anleitungsdetails', zh: '指南详情' },
         liveGpsMode: { en: 'Live GPS Mode', es: 'Modo GPS en Vivo', fr: 'Mode GPS en Direct', de: 'Live-GPS-Modus', zh: '实时GPS模式' },
-        pois: { en: 'Points of Interest', es: 'Puntos de Interés', fr: 'Points d\'Intérêt', de: 'Sehenswürdigkeiten', zh: '兴趣点' },
-        newGuide: { en: 'New Guide', es: 'Nueva Guía', fr: 'Nouveau Guide', de: 'Neue Anleitung', zh: '新指南' },
-        generateGuide: { en: 'Generate Guide with AI', es: 'Generar Guía con IA', fr: 'Générer un Guide avec l\'IA', de: 'Anleitung mit KI generieren', zh: '使用AI生成指南' },
-        importGuides: { en: 'Import Guides', es: 'Importar Guías', fr: 'Importer des Guides', de: 'Anleitungen importieren', zh: '导入指南' },
-        exportAll: { en: 'Export All Guides', es: 'Exportar Todas', fr: 'Tout Exporter', de: 'Alle exportieren', zh: '导出全部指南' },
-        newBtn: { en: 'New', es: 'Nuevo', fr: 'Nouveau', de: 'Neu', zh: '新建' }
+        pois: { en: 'Points of Interest', es: 'Puntos de Interés', fr: 'Points d\'Intérêt', de: 'Sehenswürdigkeiten', zh: '兴趣点' }
     };
 
     function translateUI(lang) {
@@ -114,19 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const poiListHeader = sidebarMapView.querySelector('h5');
         if (poiListHeader) poiListHeader.textContent = uiStrings.pois[l];
-
-        // Editor buttons (check if they exist)
-        const generateBtn = document.getElementById('generate-guide-btn');
-        if(generateBtn) generateBtn.title = uiStrings.generateGuide[l];
-
-        const importBtn = document.getElementById('import-guides-btn');
-        if(importBtn) importBtn.title = uiStrings.importGuides[l];
-
-        const exportAllBtn = document.getElementById('export-all-btn');
-        if(exportAllBtn) exportAllBtn.title = uiStrings.exportAll[l];
-
-        // Re-render the global action buttons to apply new translations
-        renderGlobalActions();
     }
 
     // -----------------------------------------------------------------------------
@@ -147,6 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('guide-search-input').addEventListener('input', (e) => {
             renderGuideList(e.target.value.toLowerCase());
         });
+
+        // Activity Bar Editor Actions
+        document.getElementById('ac-generate-guide-btn').onclick = showGenerateGuideModal;
+        document.getElementById('ac-create-guide-btn').onclick = createNewGuide;
+        document.getElementById('ac-import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
+        document.getElementById('ac-export-all-btn').onclick = exportAllGuides;
 
         // Modals
         formModalCloseBtn.onclick = () => hideFormModal();
@@ -246,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             authContainer.innerHTML = `<button id="login-btn" class="activity-btn" title="Login"><i class="fas fa-sign-in-alt"></i></button>`;
             authContainer.querySelector('#login-btn').addEventListener('click', loginWithGoogle);
         }
-        renderGlobalActions();
+        updateActionButtonsVisibility();
         updateHeaderControls();
     }
 
@@ -650,28 +638,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------------
     // Edit Mode & CRUD
     // -----------------------------------------------------------------------------
-    function renderGlobalActions() {
-        const container = document.getElementById('global-actions-container');
-        const hr = document.getElementById('global-actions-hr');
-        container.innerHTML = ''; // Clear previous buttons
-
+    function updateActionButtonsVisibility() {
+        const container = document.getElementById('editor-actions-activity-bar');
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
-        if (!isEditor) {
-            hr.classList.add('hidden');
-            return;
-        }
 
-        hr.classList.remove('hidden');
-        container.innerHTML = `
-            <button id="generate-guide-btn" class="btn-modern btn-modern-primary"><i class="fas fa-magic"></i> ${uiStrings.generateGuide[selectedLanguage] || 'Generate Guide with AI'}</button>
-            <button id="create-guide-btn" class="btn-modern"><i class="fas fa-plus"></i> ${uiStrings.newGuide[selectedLanguage] || 'New Guide'}</button>
-            <button id="import-guides-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-file-import"></i> ${uiStrings.importGuides[selectedLanguage] || 'Import Guides'}</button>
-            <button id="export-all-btn" class="btn-modern btn-modern-secondary"><i class="fas fa-file-export"></i> ${uiStrings.exportAll[selectedLanguage] || 'Export All Guides'}</button>
-        `;
-        container.querySelector('#generate-guide-btn').onclick = showGenerateGuideModal;
-        container.querySelector('#create-guide-btn').onclick = createNewGuide;
-        container.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
-        container.querySelector('#export-all-btn').onclick = exportAllGuides;
+        if (isEditor) {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
+        }
     }
 
     function updateHeaderControls() {
@@ -1512,10 +1487,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tutorial Logic
     // -----------------------------------------------------------------------------
     function checkAndStartTutorial() {
-        if (userProfile?.role === 'editor' && !localStorage.getItem('waywhispery_tutorial_seen')) {
+        const tutorialToggle = document.getElementById('tutorial-toggle');
+        if (userProfile?.role === 'editor' && tutorialToggle?.checked) {
             startEditorTutorial();
         }
     }
+
+    const tutorialStrings = {
+        welcome: { en: 'Welcome, Editor!', es: '¡Bienvenido, Editor!', fr: 'Bienvenue, Éditeur !', de: 'Willkommen, Editor!', zh: '欢迎，编辑！' },
+        guidesList: { en: 'This is the main guide list. Click here to see all available guides.', es: 'Esta es la lista principal de guías. Haz clic aquí para ver todas las guías disponibles.', fr: 'Ceci est la liste principale des guides. Cliquez ici pour voir tous les guides disponibles.', de: 'Dies ist die Hauptliste der Anleitungen. Klicken Sie hier, um alle verfügbaren Anleitungen zu sehen.', zh: '这是主指南列表。点击此处查看所有可用的指南。' },
+        createAI: { en: 'Create with AI', es: 'Crear con IA', fr: 'Créer avec l\'IA', de: 'Mit KI erstellen', zh: '使用AI创建' },
+        aiDesc: { en: 'Click this magic button to generate a complete, multilingual walking tour about any topic!', es: '¡Haz clic en este botón mágico para generar un tour a pie completo y multilingüe sobre cualquier tema!', fr: 'Cliquez sur ce bouton magique pour générer une visite à pied complète et multilingue sur n\'importe quel sujet !', de: 'Klicken Sie auf diesen magischen Knopf, um eine vollständige, mehrsprachige Wanderung zu jedem Thema zu erstellen!', zh: '点击这个神奇的按钮，生成关于任何主题的完整多语言徒步导览！' },
+        createManual: { en: 'Create Manually', es: 'Crear Manualmente', fr: 'Créer Manuellement', de: 'Manuell erstellen', zh: '手动创建' },
+        manualDesc: { en: 'You can also create a new guide from scratch and add points of interest yourself.', es: 'También puedes crear una nueva guía desde cero y añadir los puntos de interés tú mismo.', fr: 'Vous pouvez également créer un nouveau guide à partir de zéro et ajouter vous-même des points d\'intérêt.', de: 'Sie können auch eine neue Anleitung von Grund auf neu erstellen und selbst Sehenswürdigkeiten hinzufügen.', zh: '您也可以从头开始创建新指南并自己添加兴趣点。' },
+        skip: { en: 'Skip', es: 'Saltar', fr: 'Passer', de: 'Überspringen', zh: '跳过' },
+        next: { en: 'Next', es: 'Siguiente', fr: 'Suivant', de: 'Weiter', zh: '下一个' },
+        finish: { en: 'Finish', es: 'Terminar', fr: 'Terminer', de: 'Fertig', zh: '完成' }
+    };
 
     function startEditorTutorial() {
         // First, ensure the header controls are visible for the tutorial to find them.
@@ -1530,21 +1518,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Set the view to 'guides' once at the beginning.
         switchSidebarView('guides');
 
+        const l = selectedLanguage || 'en';
         const steps = [
             {
                 element: '#logo-btn',
-                title: 'Welcome, Editor!',
-                text: 'This is the main guide list. Click here to see all available guides.'
+                title: tutorialStrings.welcome[l],
+                text: tutorialStrings.guidesList[l]
             },
             {
                 element: '#generate-guide-btn',
-                title: 'Create with AI',
-                text: 'Click this magic button to generate a complete, multilingual walking tour about any topic!'
+                title: tutorialStrings.createAI[l],
+                text: tutorialStrings.aiDesc[l]
             },
             {
                 element: '#create-guide-btn',
-                title: 'Create Manually',
-                text: 'You can also create a new guide from scratch and add points of interest yourself.'
+                title: tutorialStrings.createManual[l],
+                text: tutorialStrings.manualDesc[l]
             }
         ];
 
@@ -1567,8 +1556,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h4>${step.title}</h4>
                 <p>${step.text}</p>
                 <div class="tooltip-actions">
-                    <button class="btn-modern btn-modern-secondary" id="skip-tutorial">Skip</button>
-                    <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? 'Finish' : 'Next'}</button>
+                    <button class="btn-modern btn-modern-secondary" id="skip-tutorial">${tutorialStrings.skip[l]}</button>
+                    <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? tutorialStrings.finish[l] : tutorialStrings.next[l]}</button>
                 </div>
                 <div class="tooltip-arrow down"></div>
             `;
@@ -1595,7 +1584,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function cleanup() {
             if (overlay) overlay.remove();
             if (tooltip) tooltip.remove();
-            localStorage.setItem('waywhispery_tutorial_seen', 'true');
+            // No longer using localStorage, the toggle on splash screen is the only control
         }
 
         // Start the tutorial
