@@ -657,6 +657,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const { data: guides, error } = await query;
 
+        console.log("Supabase response received.");
+        console.log("Error object:", error);
+        console.log("Data object:", guides);
+        console.log(`Found ${guides ? guides.length : 0} guides.`);
+
         if (error) {
             console.error("Error fetching guides:", error);
             guideCatalogList.innerHTML = `<p>Error loading guides.</p>`;
@@ -1831,8 +1836,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function setupMobileConsole() {
+        const consoleEl = document.getElementById('mobile-console');
+        const contentEl = document.getElementById('mobile-console-content');
+        const toggleBtn = document.getElementById('mobile-console-toggle');
+        const closeBtn = document.getElementById('mobile-console-close');
+        const clearBtn = document.getElementById('mobile-console-clear');
+
+        toggleBtn.addEventListener('click', () => consoleEl.classList.toggle('hidden'));
+        closeBtn.addEventListener('click', () => consoleEl.classList.add('hidden'));
+        clearBtn.addEventListener('click', () => contentEl.innerHTML = '');
+
+        function createLogMessage(message, level) {
+            const p = document.createElement('p');
+            p.className = `log-${level}`;
+            // Attempt to stringify objects for better readability
+            const formattedMessage = typeof message === 'object' ? JSON.stringify(message, null, 2) : message;
+            p.textContent = `[${level.toUpperCase()}] ${formattedMessage}`;
+            contentEl.appendChild(p);
+            // Auto-scroll to the bottom
+            contentEl.scrollTop = contentEl.scrollHeight;
+        }
+
+        const originalConsole = { ...console };
+        console.log = function(...args) {
+            originalConsole.log(...args);
+            args.forEach(arg => createLogMessage(arg, 'log'));
+        };
+        console.warn = function(...args) {
+            originalConsole.warn(...args);
+            args.forEach(arg => createLogMessage(arg, 'warn'));
+        };
+        console.error = function(...args) {
+            originalConsole.error(...args);
+            args.forEach(arg => createLogMessage(arg, 'error'));
+        };
+    }
+
     // Replace direct call with DOMContentLoaded
     init();
+    setupMobileConsole();
     //document.addEventListener('DOMContentLoaded', init);
 
 });

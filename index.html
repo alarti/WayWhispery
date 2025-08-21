@@ -167,6 +167,19 @@
 
     <input type="file" id="import-guides-input" accept=".json" style="display: none;">
 
+    <!-- Mobile Debug Console -->
+    <button id="mobile-console-toggle" class="btn-modern"><i class="fas fa-bug"></i></button>
+    <div id="mobile-console" class="hidden">
+        <div class="mobile-console-header">
+            <h4>Debug Console</h4>
+            <div>
+                <button id="mobile-console-clear" class="btn-modern btn-modern-sm btn-modern-secondary">Clear</button>
+                <button id="mobile-console-close" class="btn-modern btn-modern-sm btn-modern-danger">&times;</button>
+            </div>
+        </div>
+        <div id="mobile-console-content"></div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>

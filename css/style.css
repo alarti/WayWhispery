@@ -578,6 +578,69 @@ html, body {
     object-fit: cover;
 }
 
+/* --- Mobile Debug Console Styles --- */
+#mobile-console-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    z-index: 1998;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+#mobile-console {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40%;
+    background-color: rgba(24, 36, 36, 0.95);
+    backdrop-filter: blur(5px);
+    border-top: 1px solid var(--ww-border-color);
+    z-index: 1999;
+    display: flex;
+    flex-direction: column;
+    color: white;
+}
+
+.mobile-console-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: var(--ww-panel-bg);
+    flex-shrink: 0;
+}
+.mobile-console-header h4 {
+    margin: 0;
+}
+
+#mobile-console-content {
+    padding: 10px;
+    overflow-y: auto;
+    flex-grow: 1;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+#mobile-console-content p {
+    margin: 0 0 5px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--ww-border-color);
+    word-break: break-all;
+}
+.log-warn {
+    color: #FFD700; /* Yellow */
+}
+.log-error {
+    color: #E57373; /* Red */
+}
+
 /* --- Star Rating Styles --- */
 .star-rating {
     display: flex;
