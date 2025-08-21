@@ -1487,9 +1487,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Tutorial Logic
     // -----------------------------------------------------------------------------
     function checkAndStartTutorial() {
+        console.log("Checking if tutorial should start...");
         const tutorialToggle = document.getElementById('tutorial-toggle');
+
+        console.log("User role:", userProfile?.role);
+        console.log("Tutorial toggle element found:", !!tutorialToggle);
+
+        if (tutorialToggle) {
+            console.log("Tutorial toggle is checked:", tutorialToggle.checked);
+        }
+
         if (userProfile?.role === 'editor' && tutorialToggle?.checked) {
+            console.log("Conditions met. Starting tutorial...");
             startEditorTutorial();
+        } else {
+            console.log("Tutorial conditions not met. Skipping tutorial.");
         }
     }
 
