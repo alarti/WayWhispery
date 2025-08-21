@@ -17,10 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Local Database (IndexedDB with Dexie.js)
     // -----------------------------------------------------------------------------
     const db = new Dexie('waywhispery_db');
-    db.version(2).stores({
+    db.version(3).stores({
         guides: 'id, slug, *available_langs', // Primary key 'id', index on 'slug' and 'available_langs'
         guide_poi: 'id, guide_id', // Primary key 'id', index on 'guide_id'
-        mutations: '++id' // Auto-incrementing primary key for outbox pattern
+        mutations: '++id, error_count' // Auto-incrementing PK, index on error_count for querying failed mutations
     });
 
     // -----------------------------------------------------------------------------
@@ -595,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function renderGuideList(searchTerm = '') {
+    async function renderGuideList(searchTerm = '') {
         const guidesToRender = searchTerm
             ? allFetchedGuides.filter(guide => {
                 const guideDetails = guide.details?.[selectedLanguage] || guide.details?.[guide.default_lang] || { title: '', summary: '' };
@@ -610,11 +610,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Get all guide IDs that have pending mutations
+        const pendingMutations = await db.mutations.toArray();
+        const pendingGuideIds = new Set();
+        for (const mut of pendingMutations) {
+            if (mut.type === 'guide_create' || mut.type === 'guide_delete') {
+                pendingGuideIds.add(mut.payload.id);
+            } else if (mut.type === 'poi_upsert' || mut.type === 'poi_delete') {
+                pendingGuideIds.add(mut.payload.guide_id);
+            }
+        }
+
         const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
         guideCatalogList.innerHTML = '';
         guidesToRender.forEach(guide => {
             const card = document.createElement('div');
             card.className = 'card';
+            if (pendingGuideIds.has(guide.id)) {
+                card.classList.add('pending-sync');
+            }
             card.dataset.guideId = guide.id; // Set guide ID for rating logic
 
             let details_obj = guide.details;
@@ -1030,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mutations = [];
                 // Queue deletions
                 poisToDelete.forEach(id => {
-                    mutations.push({ type: 'poi_delete', payload: { id }, createdAt: new Date() });
+                    mutations.push({ type: 'poi_delete', payload: { id: id, guide_id: currentGuide.id }, createdAt: new Date() });
                 });
                 // Queue upserts
                 const sectionsToSave = pois.map((poi, index) => ({
@@ -2002,40 +2016,56 @@ document.addEventListener('DOMContentLoaded', () => {
             const localMutations = await db.mutations.orderBy('createdAt').toArray();
             if (localMutations.length > 0) {
                 console.log(`Found ${localMutations.length} local mutations to sync.`);
-                for (const mutation of localMutations) {
-                    let error = null;
-                    switch (mutation.type) {
-                        case 'rate_guide':
-                            ({ error } = await supabase.rpc('rate_guide', {
-                                guide_id_to_rate: mutation.payload.guideId,
-                                rating_value: mutation.payload.ratingValue
-                            }));
-                            break;
-                        case 'guide_create':
-                            ({ error } = await supabase.from('guides').insert(mutation.payload));
-                            break;
-                        case 'poi_upsert':
-                             ({ error } = await supabase.from('guide_poi').upsert(mutation.payload));
-                            break;
-                        case 'poi_delete':
-                            ({ error } = await supabase.from('guide_poi').delete().eq('id', mutation.payload.id));
-                            break;
-                        case 'guide_delete':
-                            ({ error } = await supabase.from('guides').delete().eq('id', mutation.payload.id));
-                            break;
-                    }
+                let failedMutations = 0;
 
-                    if (error) {
+                for (const mutation of localMutations) {
+                    try {
+                        let error = null;
+                        switch (mutation.type) {
+                            case 'rate_guide':
+                                ({ error } = await supabase.rpc('rate_guide', {
+                                    guide_id_to_rate: mutation.payload.guideId,
+                                    rating_value: mutation.payload.ratingValue
+                                }));
+                                break;
+                            case 'guide_create':
+                                ({ error } = await supabase.from('guides').insert(mutation.payload));
+                                break;
+                            case 'poi_upsert':
+                                ({ error } = await supabase.from('guide_poi').upsert(mutation.payload));
+                                break;
+                            case 'poi_delete':
+                                ({ error } = await supabase.from('guide_poi').delete().eq('id', mutation.payload.id));
+                                break;
+                            case 'guide_delete':
+                                ({ error } = await supabase.from('guides').delete().eq('id', mutation.payload.id));
+                                break;
+                        }
+
+                        if (error) {
+                            // Throw to be caught by the catch block
+                            throw error;
+                        } else {
+                            // On successful sync, delete the mutation from the outbox
+                            await db.mutations.delete(mutation.id);
+                            console.log(`Successfully synced mutation ${mutation.id} (${mutation.type}).`);
+                        }
+                    } catch (error) {
+                        failedMutations++;
                         console.error(`Failed to sync mutation ${mutation.id} (${mutation.type}):`, error);
-                        // Stop processing on first error to maintain order and prevent data issues
-                        throw new Error(`Sync failed on mutation ${mutation.id}. Please check console.`);
-                    } else {
-                        // On successful sync, delete the mutation from the outbox
-                        await db.mutations.delete(mutation.id);
-                        console.log(`Successfully synced mutation ${mutation.id} (${mutation.type}).`);
+                        // Update the mutation record with error info instead of stopping
+                        await db.mutations.update(mutation.id, {
+                            error_count: (mutation.error_count || 0) + 1,
+                            last_error_message: error.message
+                        });
                     }
                 }
-                console.log("Local mutations sync complete.");
+
+                if (failedMutations > 0) {
+                    alert(`${failedMutations} local changes could not be synced. Please check the console for details.`);
+                } else {
+                    console.log("Local mutations sync complete.");
+                }
             }
 
         } catch (error) {
@@ -2059,12 +2089,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function registerPeriodicSync() {
+        if ('serviceWorker' in navigator && 'PeriodicSyncManager' in window) {
+            const registration = await navigator.serviceWorker.ready;
+            try {
+                await registration.periodicSync.register('sync-guides', {
+                    minInterval: 24 * 60 * 60 * 1000, // 24 hours
+                });
+                console.log('Periodic sync registered');
+            } catch (error) {
+                console.error('Periodic sync could not be registered:', error);
+            }
+        } else {
+            console.log('Periodic Background Sync not supported.');
+        }
+    }
+
     // Replace direct call with DOMContentLoaded
     init();
     setupMobileConsole();
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
     updateOnlineStatus(); // Set initial status
+    registerPeriodicSync();
     //document.addEventListener('DOMContentLoaded', init);
 
 });

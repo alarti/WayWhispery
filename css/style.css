@@ -160,6 +160,20 @@ html, body {
     color: var(--ww-text-secondary);
     margin: 0;
 }
+#guide-catalog-list .card.pending-sync {
+    position: relative;
+    border-left: 3px solid var(--ww-accent-yellow);
+}
+#guide-catalog-list .card.pending-sync::after {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f017"; /* Clock icon */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: var(--ww-accent-yellow);
+    opacity: 0.8;
+}
 
 #poi-list {
     list-style: none;
