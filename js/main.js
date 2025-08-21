@@ -1518,92 +1518,94 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function startEditorTutorial() {
-        // First, ensure the header controls are visible for the tutorial to find them.
+        // First, ensure the header controls are updated.
         updateHeaderControls();
-
-        // Safeguard: Before starting, check if the key tutorial element exists.
-        if (!document.getElementById('generate-guide-btn')) {
-            console.warn("Tutorial skipped: Editor controls not visible.");
-            return;
-        }
-
-        // Set the view to 'guides' once at the beginning.
+        // Then, ensure the correct sidebar view is active.
         switchSidebarView('guides');
 
-        const l = selectedLanguage || 'en';
-        const steps = [
-            {
-                element: '#logo-btn',
-                title: tutorialStrings.welcome[l],
-                text: tutorialStrings.guidesList[l]
-            },
-            {
-                element: '#generate-guide-btn',
-                title: tutorialStrings.createAI[l],
-                text: tutorialStrings.aiDesc[l]
-            },
-            {
-                element: '#create-guide-btn',
-                title: tutorialStrings.createManual[l],
-                text: tutorialStrings.manualDesc[l]
-            }
-        ];
-
-        let currentStep = 0;
-        let overlay, tooltip;
-
-        function showStep(stepIndex) {
-            const step = steps[stepIndex];
-            const targetElement = document.querySelector(step.element);
-            if (!targetElement) {
-                console.warn('Tutorial element not found:', step.element);
-                cleanup();
+        // Defer the rest of the tutorial logic until the next animation frame.
+        // This ensures the DOM has been updated by the functions above before we query it.
+        requestAnimationFrame(() => {
+            // Safeguard: Now that the DOM should be ready, check if the key element exists.
+            if (!document.getElementById('ac-generate-guide-btn')) {
+                console.warn("Tutorial skipped: Editor controls not visible even after render.");
                 return;
             }
 
-            // Create tooltip
-            tooltip = document.createElement('div');
-            tooltip.className = 'tooltip-box';
-            tooltip.innerHTML = `
-                <h4>${step.title}</h4>
-                <p>${step.text}</p>
-                <div class="tooltip-actions">
-                    <button class="btn-modern btn-modern-secondary" id="skip-tutorial">${tutorialStrings.skip[l]}</button>
-                    <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? tutorialStrings.finish[l] : tutorialStrings.next[l]}</button>
-                </div>
-                <div class="tooltip-arrow down"></div>
-            `;
-            document.body.appendChild(tooltip);
-
-            // Position tooltip
-            const targetRect = targetElement.getBoundingClientRect();
-            tooltip.style.top = `${targetRect.bottom + 10}px`;
-            tooltip.style.left = `${targetRect.left}px`;
-
-            // Event listeners
-            tooltip.querySelector('#skip-tutorial').onclick = cleanup;
-            tooltip.querySelector('#next-tutorial').onclick = () => {
-                currentStep++;
-                if (currentStep >= steps.length) {
-                    cleanup();
-                } else {
-                    tooltip.remove();
-                    showStep(currentStep);
+            const l = selectedLanguage || 'en';
+            const steps = [
+                {
+                    element: '#logo-btn',
+                    title: tutorialStrings.welcome[l],
+                    text: tutorialStrings.guidesList[l]
+                },
+                {
+                    element: '#ac-generate-guide-btn',
+                    title: tutorialStrings.createAI[l],
+                    text: tutorialStrings.aiDesc[l]
+                },
+                {
+                    element: '#ac-create-guide-btn',
+                    title: tutorialStrings.createManual[l],
+                    text: tutorialStrings.manualDesc[l]
                 }
-            };
-        }
+            ];
 
-        function cleanup() {
-            if (overlay) overlay.remove();
-            if (tooltip) tooltip.remove();
-            // No longer using localStorage, the toggle on splash screen is the only control
-        }
+            let currentStep = 0;
+            let overlay, tooltip;
 
-        // Start the tutorial
-        overlay = document.createElement('div');
-        overlay.className = 'tooltip-overlay';
-        document.body.appendChild(overlay);
-        showStep(currentStep);
+            function showStep(stepIndex) {
+                const step = steps[stepIndex];
+                const targetElement = document.querySelector(step.element);
+                if (!targetElement) {
+                    console.warn('Tutorial element not found:', step.element);
+                    cleanup();
+                    return;
+                }
+
+                // Create tooltip
+                tooltip = document.createElement('div');
+                tooltip.className = 'tooltip-box';
+                tooltip.innerHTML = `
+                    <h4>${step.title}</h4>
+                    <p>${step.text}</p>
+                    <div class="tooltip-actions">
+                        <button class="btn-modern btn-modern-secondary" id="skip-tutorial">${tutorialStrings.skip[l]}</button>
+                        <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? tutorialStrings.finish[l] : tutorialStrings.next[l]}</button>
+                    </div>
+                    <div class="tooltip-arrow down"></div>
+                `;
+                document.body.appendChild(tooltip);
+
+                // Position tooltip
+                const targetRect = targetElement.getBoundingClientRect();
+                tooltip.style.top = `${targetRect.bottom + 10}px`;
+                tooltip.style.left = `${targetRect.left}px`;
+
+                // Event listeners
+                tooltip.querySelector('#skip-tutorial').onclick = cleanup;
+                tooltip.querySelector('#next-tutorial').onclick = () => {
+                    currentStep++;
+                    if (currentStep >= steps.length) {
+                        cleanup();
+                    } else {
+                        tooltip.remove();
+                        showStep(currentStep);
+                    }
+                };
+            }
+
+            function cleanup() {
+                if (overlay) overlay.remove();
+                if (tooltip) tooltip.remove();
+            }
+
+            // Start the tutorial
+            overlay = document.createElement('div');
+            overlay.className = 'tooltip-overlay';
+            document.body.appendChild(overlay);
+            showStep(currentStep);
+        });
     }
 
     // -----------------------------------------------------------------------------
