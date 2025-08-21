@@ -306,11 +306,13 @@ document.addEventListener('DOMContentLoaded', () => {
         container.classList.remove('hidden');
         select.innerHTML = '';
         const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+        const flagEmojiMap = { en: '🇬🇧', es: '🇪🇸', fr: '🇫🇷', de: '🇩🇪', zh: '🇨🇳' };
 
         currentGuide.available_langs.forEach(lang => {
             const option = document.createElement('option');
             option.value = lang;
-            option.textContent = langMap[lang] || lang;
+            const emoji = flagEmojiMap[lang] || '🏳️';
+            option.textContent = `${emoji} ${langMap[lang] || lang}`;
             if (lang === currentGuide.current_lang) {
                 option.selected = true;
             }
@@ -623,8 +625,20 @@ document.addEventListener('DOMContentLoaded', () => {
             sidebarHeaderControls.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
             sidebarHeaderControls.querySelector('#export-all-btn').onclick = exportAllGuides;
             sidebarHeaderControls.querySelector('#create-guide-btn').onclick = createNewGuide;
-        } else if (currentView === 'map' && currentGuide) {
-            setMode(isEditMode ? 'edit' : 'view'); // Re-render controls for map view
+        } else if (currentView === 'map') {
+            if (currentGuide) {
+                setMode(isEditMode ? 'edit' : 'view'); // Re-render controls for map view
+            } else {
+                // No guide is loaded, but show the main creation buttons for editors
+                sidebarHeaderControls.innerHTML = `
+                    <button id="generate-guide-btn" class="btn-modern btn-modern-sm btn-modern-primary" title="Generate Guide with AI"><i class="fas fa-magic"></i></button>
+                    <button id="import-guides-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Import Guides"><i class="fas fa-file-import"></i></button>
+                    <button id="create-guide-btn" class="btn-modern btn-modern-sm" title="New Guide"><i class="fas fa-plus"></i> New</button>
+                `;
+                sidebarHeaderControls.querySelector('#generate-guide-btn').onclick = showGenerateGuideModal;
+                sidebarHeaderControls.querySelector('#import-guides-btn').onclick = () => document.getElementById('import-guides-input').click();
+                sidebarHeaderControls.querySelector('#create-guide-btn').onclick = createNewGuide;
+            }
         }
     }
 
@@ -1445,6 +1459,96 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -----------------------------------------------------------------------------
+    // Tutorial Logic
+    // -----------------------------------------------------------------------------
+    function checkAndStartTutorial() {
+        if (userProfile?.role === 'editor' && !localStorage.getItem('waywhispery_tutorial_seen')) {
+            startEditorTutorial();
+        }
+    }
+
+    function startEditorTutorial() {
+        const steps = [
+            {
+                element: '#logo-btn',
+                title: 'Welcome, Editor!',
+                text: 'This is the main guide list. Click here to see all available guides.'
+            },
+            {
+                element: '#generate-guide-btn',
+                title: 'Create with AI',
+                text: 'Click this magic button to generate a complete, multilingual walking tour about any topic!'
+            },
+            {
+                element: '#create-guide-btn',
+                title: 'Create Manually',
+                text: 'You can also create a new guide from scratch and add points of interest yourself.'
+            }
+        ];
+
+        let currentStep = 0;
+        let overlay, tooltip;
+
+        function showStep(stepIndex) {
+            const step = steps[stepIndex];
+            const targetElement = document.querySelector(step.element);
+            if (!targetElement) {
+                console.warn('Tutorial element not found:', step.element);
+                cleanup();
+                return;
+            }
+
+            // Ensure the view is correct
+            if (step.element === '#logo-btn' || step.element === '#generate-guide-btn' || step.element === '#create-guide-btn') {
+                switchSidebarView('guides');
+            }
+
+            // Create tooltip
+            tooltip = document.createElement('div');
+            tooltip.className = 'tooltip-box';
+            tooltip.innerHTML = `
+                <h4>${step.title}</h4>
+                <p>${step.text}</p>
+                <div class="tooltip-actions">
+                    <button class="btn-modern btn-modern-secondary" id="skip-tutorial">Skip</button>
+                    <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? 'Finish' : 'Next'}</button>
+                </div>
+                <div class="tooltip-arrow down"></div>
+            `;
+            document.body.appendChild(tooltip);
+
+            // Position tooltip
+            const targetRect = targetElement.getBoundingClientRect();
+            tooltip.style.top = `${targetRect.bottom + 10}px`;
+            tooltip.style.left = `${targetRect.left}px`;
+
+            // Event listeners
+            tooltip.querySelector('#skip-tutorial').onclick = cleanup;
+            tooltip.querySelector('#next-tutorial').onclick = () => {
+                currentStep++;
+                if (currentStep >= steps.length) {
+                    cleanup();
+                } else {
+                    tooltip.remove();
+                    showStep(currentStep);
+                }
+            };
+        }
+
+        function cleanup() {
+            if (overlay) overlay.remove();
+            if (tooltip) tooltip.remove();
+            localStorage.setItem('waywhispery_tutorial_seen', 'true');
+        }
+
+        // Start the tutorial
+        overlay = document.createElement('div');
+        overlay.className = 'tooltip-overlay';
+        document.body.appendChild(overlay);
+        showStep(currentStep);
+    }
+
+    // -----------------------------------------------------------------------------
     // Initializer
     // -----------------------------------------------------------------------------
     async function init() {
@@ -1454,25 +1558,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const splashLoginBtn = document.getElementById('splash-login-btn');
 
         function updateLangButton(lang) {
-            langBtn.innerHTML = `<img src="https://flagcdn.com/w20/${lang}.png" alt="${lang}">`;
+            const flagCodeMap = { en: 'gb', zh: 'cn' };
+            const flagCode = flagCodeMap[lang] || lang;
+            langBtn.innerHTML = `<img src="https://flagcdn.com/w20/${flagCode}.png" alt="${lang}">`;
         }
 
         function populateLangMenu() {
             const langMenu = document.getElementById('lang-menu');
             const langMap = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', zh: '中文' };
+            const flagCodeMap = { en: 'gb', zh: 'cn' }; // Map for special flag codes
             langMenu.innerHTML = ''; // Clear previous options
             for (const [code, name] of Object.entries(langMap)) {
+                const flagCode = flagCodeMap[code] || code;
                 const langItem = document.createElement('button');
                 langItem.className = 'logout-btn'; // Re-use style
-                langItem.innerHTML = `<img src="https://flagcdn.com/w20/${code}.png" alt="${name}" style="margin-right: 10px;"> ${name}`;
+                langItem.innerHTML = `<img src="https://flagcdn.com/w20/${flagCode}.png" alt="${name}" style="margin-right: 10px;"> ${name}`;
                 langItem.addEventListener('click', () => {
-                    // This now just updates the global language and refreshes the guide list
+                    // This is now a global language switcher
                     selectedLanguage = code;
                     updateLangButton(code);
-                    fetchAndDisplayGuides();
                     langMenu.classList.remove('visible');
-                    // If we are in the map view, switch back to the guides list
-                    if (sidebarMapView.classList.contains('active')) {
+
+                    // 1. Refresh the guide list with the new language
+                    fetchAndDisplayGuides();
+
+                    // 2. If a guide is currently open, try to switch its language
+                    if (currentGuide && currentGuide.available_langs.includes(code)) {
+                        switchGuideLanguage(code);
+                    }
+
+                    // 3. Ensure the guides view is active if we are not in a guide context
+                    if (!currentGuide) {
                         switchSidebarView('guides');
                     }
                 });
@@ -1498,6 +1614,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         userProfile = currentUser ? await getProfile(currentUser.id) : null;
                         updateUIforAuth();
                         updateHeaderControls(); // Also update header controls on auth change
+                        checkAndStartTutorial(); // Check if we need to show the tutorial
                     });
 
                     // Get initial session

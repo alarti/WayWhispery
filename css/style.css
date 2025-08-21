@@ -40,6 +40,7 @@ html, body {
 /* --- Activity Bar --- */
 .activity-bar {
     width: 50px;
+    --activity-bar-width: 50px; /* Define variable */
     background-color: #000;
     display: flex;
     flex-direction: column;
@@ -458,9 +459,10 @@ html, body {
 .dropdown-menu {
     display: none; /* Hidden by default */
     position: absolute;
-    left: var(--activity-bar-width); /* Position next to the activity bar */
+    left: 50px; /* Position next to the activity bar */
     top: 0;
-    background-color: #f9f9f9;
+    background-color: var(--ww-panel-bg);
+    border: 1px solid var(--ww-border-color);
     min-width: 200px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
     z-index: 1000;
@@ -469,15 +471,22 @@ html, body {
     text-align: left;
 }
 
+/* For menus at the bottom of the activity bar, make them open upwards */
+#lang-menu-container .dropdown-menu,
+#auth-container-activity .dropdown-menu {
+    top: auto;
+    bottom: 0;
+}
+
 .dropdown-menu.visible {
     display: block;
 }
 
 .dropdown-menu .user-email {
-    color: #333;
+    color: var(--ww-text-light);
     font-weight: bold;
     padding-bottom: 8px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--ww-border-color);
     margin-bottom: 8px;
     display: block;
     white-space: normal;
@@ -489,8 +498,9 @@ html, body {
     padding: 8px 12px;
     background: none;
     border: none;
-    color: #333;
+    color: var(--ww-text-light);
     cursor: pointer;
+    border-radius: 4px;
 }
 
 .dropdown-menu .logout-btn:hover {
@@ -532,4 +542,48 @@ html, body {
     height: 28px;
     border-radius: 5px;
     object-fit: cover;
+}
+
+/* --- Tutorial Tooltip Styles --- */
+.tooltip-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2999; /* Below the tooltip itself */
+}
+
+.tooltip-box {
+    position: absolute;
+    background-color: var(--ww-green-light);
+    color: var(--ww-bg-dark);
+    padding: 1rem;
+    border-radius: 8px;
+    z-index: 3000;
+    width: 300px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+.tooltip-box h4 {
+    margin-top: 0;
+    color: #000;
+}
+.tooltip-arrow {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+}
+.tooltip-arrow.down {
+    border-width: 10px 10px 0 10px;
+    border-color: var(--ww-green-light) transparent transparent transparent;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.tooltip-actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
 }
