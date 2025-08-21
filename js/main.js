@@ -1618,8 +1618,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 { element: '#ac-generate-guide-btn', title: tutorialStrings.createAI[l], text: tutorialStrings.aiDesc[l], position: 'right' },
                 { element: '#ac-create-guide-btn', title: tutorialStrings.createManual[l], text: tutorialStrings.manualDesc[l], position: 'right' },
                 { element: '#ac-import-guides-btn', title: tutorialStrings.importer[l], text: tutorialStrings.importerDesc[l], position: 'right' },
-                { element: '#lang-btn', title: tutorialStrings.language[l], text: tutorialStrings.languageDesc[l], position: 'top' },
-                { element: '#auth-container-activity', title: tutorialStrings.session[l], text: tutorialStrings.sessionDesc[l], position: 'top' }
+                { element: '#lang-btn', title: tutorialStrings.language[l], text: tutorialStrings.languageDesc[l], position: 'right' },
+                { element: '#auth-container-activity', title: tutorialStrings.session[l], text: tutorialStrings.sessionDesc[l], position: 'right' }
             ];
 
             let currentStep = 0;
@@ -1679,6 +1679,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         tooltip.style.left = `${targetRect.left}px`;
                         break;
                 }
+
+                // Final check to ensure the tooltip is not off-screen vertically
+                const finalTooltipRect = tooltip.getBoundingClientRect();
+                if (finalTooltipRect.bottom > window.innerHeight) {
+                    const newTop = window.innerHeight - finalTooltipRect.height - 10; // 10px padding from bottom
+                    tooltip.style.top = `${newTop}px`;
+                }
+
                 tooltip.style.opacity = '1'; // Make it visible
 
                 // Event listeners
