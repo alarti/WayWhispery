@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : allFetchedGuides;
 
         if (guidesToRender.length === 0) {
-            guideCatalogList.innerHTML = `<p>No guides found.</p>`;
+            guideCatalogList.innerHTML = `<p class="text-muted p-3">No guides found for the selected language. <br><br>Try selecting another language, or create a new guide if you are an editor.</p>`;
             return;
         }
 
@@ -642,6 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
+        console.log(`Fetching guides. Language: '${selectedLanguage}', Is Editor: ${isEditor}`);
+
         let query = supabase.from('guides')
             .select('id, slug, details, default_lang, available_langs, rating, rating_count')
             .contains('available_langs', `{${selectedLanguage}}`)
