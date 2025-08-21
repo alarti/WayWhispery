@@ -578,6 +578,21 @@ html, body {
     object-fit: cover;
 }
 
+#online-status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+    border: 2px solid #000;
+    transition: background-color 0.3s;
+}
+#online-status-indicator.online {
+    background-color: #4CAF50; /* Green */
+}
+#online-status-indicator.offline {
+    background-color: #757575; /* Gray */
+}
+
 /* --- Mobile Debug Console Styles --- */
 #mobile-console-toggle {
     position: fixed;

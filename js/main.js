@@ -17,9 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Local Database (IndexedDB with Dexie.js)
     // -----------------------------------------------------------------------------
     const db = new Dexie('waywhispery_db');
-    db.version(1).stores({
+    db.version(2).stores({
         guides: 'id, slug, *available_langs', // Primary key 'id', index on 'slug' and 'available_langs'
-        guide_poi: 'id, guide_id' // Primary key 'id', index on 'guide_id'
+        guide_poi: 'id, guide_id', // Primary key 'id', index on 'guide_id'
+        mutations: '++id' // Auto-incrementing primary key for outbox pattern
     });
 
     // -----------------------------------------------------------------------------
@@ -560,24 +561,37 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const { error } = await supabase.rpc('rate_guide', {
-            guide_id_to_rate: guideId,
-            rating_value: ratingValue
-        });
+        if (navigator.onLine) {
+            // Online: Call RPC directly
+            const { error } = await supabase.rpc('rate_guide', {
+                guide_id_to_rate: guideId,
+                rating_value: ratingValue
+            });
 
-        if (error) {
-            alert(`Error submitting rating: ${error.message}`);
-        } else {
-            alert('Thank you for your rating!');
-            ratedGuides.push(guideId);
-            localStorage.setItem('rated_guides', JSON.stringify(ratedGuides));
-            // Visually disable rating for this guide
-            const starContainer = document.querySelector(`.card[data-guide-id="${guideId}"] .interactive-stars`);
-            if (starContainer) {
-                starContainer.classList.remove('interactive-stars');
-                starContainer.innerHTML = 'Thanks for rating!';
+            if (error) {
+                alert(`Error submitting rating: ${error.message}`);
+                return; // Don't proceed if there was an error
+            } else {
+                alert('Thank you for your rating!');
             }
-            // We could also re-fetch to get the absolute latest average rating
+        } else {
+            // Offline: Add to mutations outbox
+            await db.mutations.add({
+                type: 'rate_guide',
+                payload: { guideId, ratingValue },
+                createdAt: new Date()
+            });
+            alert('You are offline. Your rating has been saved and will be submitted when you reconnect.');
+        }
+
+        // In both cases, mark as rated locally to prevent re-rating
+        ratedGuides.push(guideId);
+        localStorage.setItem('rated_guides', JSON.stringify(ratedGuides));
+
+        // Visually disable rating for this guide
+        const starContainer = document.querySelector(`.card[data-guide-id="${guideId}"] .interactive-stars`);
+        if (starContainer) {
+            starContainer.parentElement.innerHTML = 'Thanks for rating!';
         }
     }
 
@@ -928,7 +942,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 return false;
             }
 
+            const tempId = crypto.randomUUID();
             const newGuideData = {
+                id: tempId, // Use temp UUID for local storage
                 slug: data.slug,
                 author_id: currentUser.id,
                 status: 'draft',
@@ -942,65 +958,108 @@ document.addEventListener('DOMContentLoaded', () => {
                         title: data.title,
                         summary: data.summary
                     }
-                }
+                },
+                rating: 0,
+                rating_count: 0,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
             };
 
-            const { data: guideData, error } = await supabase.from('guides').insert(newGuideData).select().single();
-            if (error) {
-                alert(`Error creating guide: ${error.message}`);
-                return false;
+            if (navigator.onLine) {
+                // Online: Insert into Supabase, then update local
+                const { data: guideData, error } = await supabase.from('guides').insert(newGuideData).select().single();
+                if (error) {
+                    alert(`Error creating guide: ${error.message}`);
+                    return false;
+                }
+                await db.guides.put(guideData); // Use put to add/update local
+                await loadGuide(guideData.slug);
+            } else {
+                // Offline: Insert into local DB and queue mutation
+                await db.guides.add(newGuideData);
+                await db.mutations.add({
+                    type: 'guide_create',
+                    payload: newGuideData,
+                    createdAt: new Date()
+                });
+                alert('You are offline. Guide created locally and will be synced when you reconnect.');
+                await loadGuide(newGuideData.slug);
             }
-            if (!guideData) {
-                alert("Failed to create guide. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
-                return false;
-            }
-            await loadGuide(guideData.slug);
+
             setMode('edit');
             return true;
         });
     }
 
     async function saveGuide() {
-        // 1. Delete POIs that were marked for deletion
-        if (poisToDelete.length > 0) {
-            const { error: deleteError } = await supabase.from('guide_poi').delete().in('id', poisToDelete);
-            if (deleteError) {
-                alert(`Error deleting POIs: ${deleteError.message}`);
-                return; // Stop if deletion fails
-            }
-            poisToDelete = []; // Clear the array after successful deletion
-        }
+        if (navigator.onLine) {
+            // ONLINE: Perform operations on Supabase first, then sync to local
+            try {
+                if (poisToDelete.length > 0) {
+                    await supabase.from('guide_poi').delete().in('id', poisToDelete);
+                }
+                const sectionsToSave = pois.map((poi, index) => ({
+                    id: poi.id.startsWith('temp-') ? crypto.randomUUID() : poi.id,
+                    guide_id: currentGuide.id,
+                    texts: poi.texts,
+                    lat: poi.lat,
+                    lon: poi.lon,
+                    order: index
+                }));
+                if (sectionsToSave.length > 0) {
+                    await supabase.from('guide_poi').upsert(sectionsToSave);
+                }
 
-        // 2. Upsert (insert or update) the remaining POIs
-        const sectionsToSave = pois.map((poi, index) => {
-            // This needs to be adapted for the new multi-language structure
-            const poiData = {
-                guide_id: currentGuide.id,
-                texts: poi.texts, // Assuming poi.texts is the JSONB object
-                lat: poi.lat,
-                lon: poi.lon,
-                order: index
-            };
-            if (!poi.id.toString().startsWith('temp-')) {
-                poiData.id = poi.id;
-            }
-            return poiData;
-        });
+                // Now sync local DB
+                if (poisToDelete.length > 0) {
+                    await db.guide_poi.bulkDelete(poisToDelete);
+                }
+                await db.guide_poi.bulkPut(sectionsToSave);
 
-        // 2. Upsert (insert or update) the remaining POIs
-        if (sectionsToSave.length > 0) {
-            const { data: upsertData, error: upsertError } = await supabase.from('guide_poi').upsert(sectionsToSave).select();
-            if (upsertError) {
-                alert(`Error saving POIs: ${upsertError.message}`);
+                poisToDelete = [];
+                alert('Guide saved successfully!');
+
+            } catch (error) {
+                alert(`Error saving guide online: ${error.message}`);
                 return;
             }
-            if (!upsertData || upsertData.length === 0) {
-                alert("Failed to save POIs. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+
+        } else {
+            // OFFLINE: Perform operations on local DB and queue mutations
+            try {
+                const mutations = [];
+                // Queue deletions
+                poisToDelete.forEach(id => {
+                    mutations.push({ type: 'poi_delete', payload: { id }, createdAt: new Date() });
+                });
+                // Queue upserts
+                const sectionsToSave = pois.map((poi, index) => ({
+                    id: poi.id.startsWith('temp-') ? crypto.randomUUID() : poi.id,
+                    guide_id: currentGuide.id,
+                    texts: poi.texts,
+                    lat: poi.lat,
+                    lon: poi.lon,
+                    order: index
+                }));
+                sectionsToSave.forEach(poi => {
+                    mutations.push({ type: 'poi_upsert', payload: poi, createdAt: new Date() });
+                });
+
+                // Apply changes locally and add mutations to outbox
+                await db.transaction('rw', db.guide_poi, db.mutations, async () => {
+                    if (poisToDelete.length > 0) await db.guide_poi.bulkDelete(poisToDelete);
+                    if (sectionsToSave.length > 0) await db.guide_poi.bulkPut(sectionsToSave);
+                    if (mutations.length > 0) await db.mutations.bulkAdd(mutations);
+                });
+
+                poisToDelete = [];
+                alert('You are offline. Guide changes saved locally and will be synced when you reconnect.');
+
+            } catch (error) {
+                alert(`Error saving guide offline: ${error.message}`);
                 return;
             }
         }
-
-        alert('Guide saved successfully!');
         await loadGuide(currentGuide.slug); // Reload to get fresh data
     }
 
@@ -1063,16 +1122,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deleteGuide() {
         if (!currentGuide) return;
-        if (!confirm(`Are you absolutely sure you want to delete the guide "${currentGuide.title}"? This action cannot be undone.`)) return;
+        if (!confirm(`Are you absolutely sure you want todelete the guide "${currentGuide.title}"? This action cannot be undone.`)) return;
 
-        const { error } = await supabase.from('guides').delete().eq('id', currentGuide.id);
+        const guideId = currentGuide.id;
 
-        if (error) {
-            alert(`Error deleting guide: ${error.message}`);
+        if (navigator.onLine) {
+            const { error } = await supabase.from('guides').delete().eq('id', guideId);
+            if (error) {
+                alert(`Error deleting guide: ${error.message}`);
+                return;
+            }
         } else {
-            alert('Guide deleted successfully.');
-            window.location.reload(); // Reload the app to go back to the guide list
+            await db.mutations.add({
+                type: 'guide_delete',
+                payload: { id: guideId },
+                createdAt: new Date()
+            });
         }
+
+        // Delete locally in both cases
+        await db.guides.delete(guideId);
+        await db.guide_poi.where('guide_id').equals(guideId).delete();
+
+        alert('Guide deleted. It will be removed permanently on next sync if you are offline.');
+        window.location.reload();
     }
 
     function exportForTranslation() {
@@ -1923,16 +1996,75 @@ document.addEventListener('DOMContentLoaded', () => {
                 await db.guide_poi.bulkAdd(pois);
             });
 
-            console.log(`Sync complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
+            console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
+
+            // PHASE 2: Sync local mutations back to Supabase
+            const localMutations = await db.mutations.orderBy('createdAt').toArray();
+            if (localMutations.length > 0) {
+                console.log(`Found ${localMutations.length} local mutations to sync.`);
+                for (const mutation of localMutations) {
+                    let error = null;
+                    switch (mutation.type) {
+                        case 'rate_guide':
+                            ({ error } = await supabase.rpc('rate_guide', {
+                                guide_id_to_rate: mutation.payload.guideId,
+                                rating_value: mutation.payload.ratingValue
+                            }));
+                            break;
+                        case 'guide_create':
+                            ({ error } = await supabase.from('guides').insert(mutation.payload));
+                            break;
+                        case 'poi_upsert':
+                             ({ error } = await supabase.from('guide_poi').upsert(mutation.payload));
+                            break;
+                        case 'poi_delete':
+                            ({ error } = await supabase.from('guide_poi').delete().eq('id', mutation.payload.id));
+                            break;
+                        case 'guide_delete':
+                            ({ error } = await supabase.from('guides').delete().eq('id', mutation.payload.id));
+                            break;
+                    }
+
+                    if (error) {
+                        console.error(`Failed to sync mutation ${mutation.id} (${mutation.type}):`, error);
+                        // Stop processing on first error to maintain order and prevent data issues
+                        throw new Error(`Sync failed on mutation ${mutation.id}. Please check console.`);
+                    } else {
+                        // On successful sync, delete the mutation from the outbox
+                        await db.mutations.delete(mutation.id);
+                        console.log(`Successfully synced mutation ${mutation.id} (${mutation.type}).`);
+                    }
+                }
+                console.log("Local mutations sync complete.");
+            }
 
         } catch (error) {
             console.error("Supabase sync failed:", error);
+            alert(`Data synchronization failed: ${error.message}`);
+        }
+    }
+
+    function updateOnlineStatus() {
+        const indicator = document.getElementById('online-status-indicator');
+        if (navigator.onLine) {
+            indicator.classList.remove('offline');
+            indicator.classList.add('online');
+            indicator.title = 'Online';
+            // Attempt to sync any pending changes when coming online
+            syncWithSupabase();
+        } else {
+            indicator.classList.remove('online');
+            indicator.classList.add('offline');
+            indicator.title = 'Offline';
         }
     }
 
     // Replace direct call with DOMContentLoaded
     init();
     setupMobileConsole();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus(); // Set initial status
     //document.addEventListener('DOMContentLoaded', init);
 
 });
