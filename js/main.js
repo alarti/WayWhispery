@@ -87,6 +87,53 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedLanguage = null;
     let poisToDelete = [];
 
+    const uiStrings = {
+        allGuides: { en: 'All Guides', es: 'Todas las Guías', fr: 'Tous les Guides', de: 'Alle Anleitungen', zh: '所有指南' },
+        guideDetails: { en: 'Guide Details', es: 'Detalles de la Guía', fr: 'Détails du Guide', de: 'Anleitungsdetails', zh: '指南详情' },
+        liveGpsMode: { en: 'Live GPS Mode', es: 'Modo GPS en Vivo', fr: 'Mode GPS en Direct', de: 'Live-GPS-Modus', zh: '实时GPS模式' },
+        pois: { en: 'Points of Interest', es: 'Puntos de Interés', fr: 'Points d\'Intérêt', de: 'Sehenswürdigkeiten', zh: '兴趣点' },
+        newGuide: { en: 'New Guide', es: 'Nueva Guía', fr: 'Nouveau Guide', de: 'Neue Anleitung', zh: '新指南' },
+        generateGuide: { en: 'Generate Guide with AI', es: 'Generar Guía con IA', fr: 'Générer un Guide avec l\'IA', de: 'Anleitung mit KI generieren', zh: '使用AI生成指南' },
+        importGuides: { en: 'Import Guides', es: 'Importar Guías', fr: 'Importer des Guides', de: 'Anleitungen importieren', zh: '导入指南' },
+        exportAll: { en: 'Export All Guides', es: 'Exportar Todas', fr: 'Tout Exporter', de: 'Alle exportieren', zh: '导出全部指南' },
+        newBtn: { en: 'New', es: 'Nuevo', fr: 'Nouveau', de: 'Neu', zh: '新建' }
+    };
+
+    function translateUI(lang) {
+        // Ensure lang is valid, fallback to English
+        const l = uiStrings.allGuides[lang] ? lang : 'en';
+
+        // Sidebar title when no guide is selected
+        if (!currentGuide) {
+            sidebarViewTitle.textContent = uiStrings.allGuides[l];
+        }
+
+        // Other static elements
+        const liveModeLabel = document.querySelector('label[for="live-mode-toggle"]');
+        if (liveModeLabel) liveModeLabel.textContent = uiStrings.liveGpsMode[l];
+
+        const poiListHeader = sidebarMapView.querySelector('h5');
+        if (poiListHeader) poiListHeader.textContent = uiStrings.pois[l];
+
+        // Editor buttons (check if they exist)
+        const generateBtn = document.getElementById('generate-guide-btn');
+        if(generateBtn) generateBtn.title = uiStrings.generateGuide[l];
+
+        const importBtn = document.getElementById('import-guides-btn');
+        if(importBtn) importBtn.title = uiStrings.importGuides[l];
+
+        const exportAllBtn = document.getElementById('export-all-btn');
+        if(exportAllBtn) exportAllBtn.title = uiStrings.exportAll[l];
+
+        const createBtn = document.getElementById('create-guide-btn');
+        if (createBtn) {
+            // This button has an icon and text, so we need to be careful
+            const icon = createBtn.querySelector('i');
+            createBtn.innerHTML = `${icon.outerHTML} ${uiStrings.newBtn[l]}`;
+            createBtn.title = uiStrings.newGuide[l];
+        }
+    }
+
     // -----------------------------------------------------------------------------
     // Layout & UI Logic
     // -----------------------------------------------------------------------------
@@ -439,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPoiList();
             drawTourRoute();
 
-        const intros = introPhrases[currentGuide?.default_lang || 'en'] || introPhrases.en;
+            const intros = introPhrases[currentGuide?.current_lang || 'en'] || introPhrases.en;
             const randomIntro = intros[Math.floor(Math.random() * intros.length)];
             const fullDescription = `${randomIntro} ${inRangeOfPoi.name}. ${inRangeOfPoi.description}`;
 
@@ -725,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Trigger text and speech
-        const intros = introPhrases[currentGuide?.default_lang || 'en'] || introPhrases.en;
+        const intros = introPhrases[currentGuide?.current_lang || 'en'] || introPhrases.en;
         const randomIntro = intros[Math.floor(Math.random() * intros.length)];
         const fullDescription = `${randomIntro} ${poi.name}. ${poi.description}`;
 
@@ -1131,6 +1178,9 @@ document.addEventListener('DOMContentLoaded', () => {
                   "default_lang": "en",
                   "available_langs": ["en", "es", "fr", "de", "zh"],
                   "status": "draft",
+                  "initial_lat": 41.8925,
+                  "initial_lon": 12.4853,
+                  "initial_zoom": 15,
                   "details": {
                     "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." },
                     "es": { "title": "Título de la Guía en Español", "summary": "Un breve resumen de la guía, en español." },
@@ -1142,11 +1192,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     {
                       "order": 1,
                       "texts": {
-                        "en": { "title": "POI 1 Title", "description": "POI 1 Description." },
-                        "es": { "title": "Título del PDI 1", "description": "Descripción del PDI 1." },
-                        "fr": { "title": "Titre du POI 1", "description": "Description du POI 1." },
-                        "de": { "title": "Titel von POI 1", "description": "Beschreibung von POI 1." },
-                        "zh": { "title": "POI 1的标题", "description": "POI 1的描述。" }
+                        "en": { "title": "POI 1 Title", "description": "A very detailed description of the POI. Include interesting facts, historical context, and curiosities about the place.\\n\\nEstimated visit time: 15 minutes." },
+                        "es": { "title": "Título del PDI 1", "description": "Una descripción muy detallada del PDI. Incluye datos interesantes, contexto histórico y curiosidades sobre el lugar.\\n\\nTiempo estimado de visita: 15 minutos." },
+                        "fr": { "title": "Titre du POI 1", "description": "Une description très détaillée du POI. Incluez des faits intéressants, le contexte historique et des curiosités sur le lieu.\\n\\nTemps de visite estimé : 15 minutes." },
+                        "de": { "title": "Titel von POI 1", "description": "Eine sehr detaillierte Beschreibung des POI. Fügen Sie interessante Fakten, historischen Kontext und Kuriositäten über den Ort hinzu.\\n\\nGeschätzte Besuchszeit: 15 Minuten." },
+                        "zh": { "title": "POI 1的标题", "description": "关于POI的非常详细的描述。包括有关该地的有趣事实、历史背景和奇闻轶事。\\n\\n预计参观时间：15分钟。" }
                       },
                       "lat": 41.8925,
                       "lon": 12.4853
@@ -1156,9 +1206,12 @@ document.addEventListener('DOMContentLoaded', () => {
               ]
             }
 
-            Please generate a guide with 10 to 15 POIs. The POIs should be in a logical walking order.
-            You MUST invent plausible latitude and longitude coordinates for each POI, centered around the main topic location.
-            The slug should be a URL-friendly version of the English title.
+            IMPORTANT INSTRUCTIONS:
+            1. Generate a guide with 10 to 15 POIs in a logical walking order.
+            2. For EACH POI, the 'description' MUST be very detailed and engaging. Include historical facts, curiosities, and an 'Estimated visit time' on a new line.
+            3. You MUST invent plausible latitude and longitude coordinates for each POI.
+            4. The 'initial_lat' and 'initial_lon' for the guide should be the coordinates of the first POI. 'initial_zoom' should be a sensible value like 15 or 16.
+            5. The 'slug' must be a URL-friendly version of the English title.
         `;
 
         try {
@@ -1469,6 +1522,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startEditorTutorial() {
+        // First, ensure the header controls are visible for the tutorial to find them.
+        updateHeaderControls();
+
         const steps = [
             {
                 element: '#logo-btn',
@@ -1580,15 +1636,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateLangButton(code);
                     langMenu.classList.remove('visible');
 
-                    // 1. Refresh the guide list with the new language
+                    // 1. Translate the main UI
+                    translateUI(code);
+
+                    // 2. Refresh the guide list with the new language
                     fetchAndDisplayGuides();
 
-                    // 2. If a guide is currently open, try to switch its language
+                    // 3. If a guide is currently open, try to switch its language
                     if (currentGuide && currentGuide.available_langs.includes(code)) {
                         switchGuideLanguage(code);
                     }
 
-                    // 3. Ensure the guides view is active if we are not in a guide context
+                    // 4. Ensure the guides view is active if we are not in a guide context
                     if (!currentGuide) {
                         switchSidebarView('guides');
                     }
@@ -1629,6 +1688,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Fetch content for the first time
                 await fetchAndDisplayGuides();
                 updateMapView(); // Initial map view setup
+                translateUI(lang); // Translate UI on first load
 
                 // Hide splash screen after loading is complete
                 splashScreen.classList.add('hidden');
