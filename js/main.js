@@ -2012,6 +2012,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
 
+            // Refresh the guide list now that the sync is complete
+            await fetchAndDisplayGuides();
+
             // PHASE 2: Sync local mutations back to Supabase
             const localMutations = await db.mutations.orderBy('createdAt').toArray();
             if (localMutations.length > 0) {
