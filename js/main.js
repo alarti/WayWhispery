@@ -1573,12 +1573,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const tutorialStrings = {
+        // Step Titles
         welcome: { en: 'Welcome, Editor!', es: '¡Bienvenido, Editor!', fr: 'Bienvenue, Éditeur !', de: 'Willkommen, Editor!', zh: '欢迎，编辑！' },
-        guidesList: { en: 'This is the main guide list. Click here to see all available guides.', es: 'Esta es la lista principal de guías. Haz clic aquí para ver todas las guías disponibles.', fr: 'Ceci est la liste principale des guides. Cliquez ici pour voir tous les guides disponibles.', de: 'Dies ist die Hauptliste der Anleitungen. Klicken Sie hier, um alle verfügbaren Anleitungen zu sehen.', zh: '这是主指南列表。点击此处查看所有可用的指南。' },
+        mapView: { en: 'Map View', es: 'Vista de Mapa', fr: 'Vue Carte', de: 'Kartenansicht', zh: '地图视图' },
         createAI: { en: 'Create with AI', es: 'Crear con IA', fr: 'Créer avec l\'IA', de: 'Mit KI erstellen', zh: '使用AI创建' },
-        aiDesc: { en: 'Click this magic button to generate a complete, multilingual walking tour about any topic!', es: '¡Haz clic en este botón mágico para generar un tour a pie completo y multilingüe sobre cualquier tema!', fr: 'Cliquez sur ce bouton magique pour générer une visite à pied complète et multilingue sur n\'importe quel sujet !', de: 'Klicken Sie auf diesen magischen Knopf, um eine vollständige, mehrsprachige Wanderung zu jedem Thema zu erstellen!', zh: '点击这个神奇的按钮，生成关于任何主题的完整多语言徒步导览！' },
         createManual: { en: 'Create Manually', es: 'Crear Manualmente', fr: 'Créer Manuellement', de: 'Manuell erstellen', zh: '手动创建' },
+        importer: { en: 'Import/Export', es: 'Importar/Exportar', fr: 'Importer/Exporter', de: 'Import/Export', zh: '导入/导出' },
+        language: { en: 'Language', es: 'Idioma', fr: 'Langue', de: 'Sprache', zh: '语言' },
+        session: { en: 'Session', es: 'Sesión', fr: 'Session', de: 'Sitzung', zh: '会话' },
+        // Step Descriptions
+        guidesListDesc: { en: 'This is the main guide list. Click here to see all available guides.', es: 'Esta es la lista principal de guías. Haz clic aquí para ver todas las guías disponibles.', fr: 'Ceci est la liste principale des guides. Cliquez ici pour voir tous les guides disponibles.', de: 'Dies ist die Hauptliste der Anleitungen. Klicken Sie hier, um alle verfügbaren Anleitungen zu sehen.', zh: '这是主指南列表。点击此处查看所有可用的指南。' },
+        mapViewDesc: { en: 'Switch to the map view to see guides geographically and access editor tools.', es: 'Cambia a la vista de mapa para ver las guías geográficamente y acceder a las herramientas de edición.', fr: 'Passez à la vue carte pour voir les guides géographiquement et accéder aux outils d\'édition.', de: 'Wechseln Sie zur Kartenansicht, um die Anleitungen geographisch zu sehen und auf die Editor-Werkzeuge zuzugreifen.', zh: '切换到地图视图以地理方式查看指南并访问编辑器工具。' },
+        aiDesc: { en: 'Click this magic button to generate a complete, multilingual walking tour about any topic!', es: '¡Haz clic en este botón mágico para generar un tour a pie completo y multilingüe sobre cualquier tema!', fr: 'Cliquez sur ce bouton magique pour générer une visite à pied complète et multilingue sur n\'importe quel sujet !', de: 'Klicken Sie auf diesen magischen Knopf, um eine vollständige, mehrsprachige Wanderung zu jedem Thema zu erstellen!', zh: '点击这个神奇的按钮，生成关于任何主题的完整多语言徒步导览！' },
         manualDesc: { en: 'You can also create a new guide from scratch and add points of interest yourself.', es: 'También puedes crear una nueva guía desde cero y añadir los puntos de interés tú mismo.', fr: 'Vous pouvez également créer un nouveau guide à partir de zéro et ajouter vous-même des points d\'intérêt.', de: 'Sie können auch eine neue Anleitung von Grund auf neu erstellen und selbst Sehenswürdigkeiten hinzufügen.', zh: '您也可以从头开始创建新指南并自己添加兴趣点。' },
+        importerDesc: { en: 'Use these buttons to import guides from a JSON file or export all your current guides to a backup file.', es: 'Usa estos botones para importar guías desde un archivo JSON o exportar todas tus guías actuales a un archivo de respaldo.', fr: 'Utilisez ces boutons pour importer des guides à partir d\'un fichier JSON ou exporter tous vos guides actuels dans un fichier de sauvegarde.', de: 'Verwenden Sie diese Schaltflächen, um Anleitungen aus einer JSON-Datei zu importieren oder alle Ihre aktuellen Anleitungen in eine Sicherungsdatei zu exportieren.', zh: '使用这些按钮从JSON文件导入指南或将所有当前指南导出到备份文件。' },
+        languageDesc: { en: 'Change the application language and the language for filtering guides.', es: 'Cambia el idioma de la aplicación y el idioma para filtrar las guías.', fr: 'Changez la langue de l\'application et la langue de filtrage des guides.', de: 'Ändern Sie die Anwendungssprache und die Sprache zum Filtern der Anleitungen.', zh: '更改应用程序语言和筛选指南的语言。' },
+        sessionDesc: { en: 'Here you can see your user information and log out.', es: 'Aquí puedes ver la información de tu usuario y cerrar sesión.', fr: 'Ici, vous pouvez voir vos informations utilisateur et vous déconnecter.', de: 'Hier können Sie Ihre Benutzerinformationen einsehen und sich abmelden.', zh: '在这里您可以看到您的用户信息并注销。' },
+        // Buttons
         skip: { en: 'Skip', es: 'Saltar', fr: 'Passer', de: 'Überspringen', zh: '跳过' },
         next: { en: 'Next', es: 'Siguiente', fr: 'Suivant', de: 'Weiter', zh: '下一个' },
         finish: { en: 'Finish', es: 'Terminar', fr: 'Terminer', de: 'Fertig', zh: '完成' }
@@ -1601,24 +1612,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const l = selectedLanguage || 'en';
             const steps = [
-                {
-                    element: '#logo-btn',
-                    title: tutorialStrings.welcome[l],
-                    text: tutorialStrings.guidesList[l],
-                    position: 'right'
-                },
-                {
-                    element: '#ac-generate-guide-btn',
-                    title: tutorialStrings.createAI[l],
-                    text: tutorialStrings.aiDesc[l],
-                    position: 'right'
-                },
-                {
-                    element: '#ac-create-guide-btn',
-                    title: tutorialStrings.createManual[l],
-                    text: tutorialStrings.manualDesc[l],
-                    position: 'right'
-                }
+                { element: '#logo-btn', title: tutorialStrings.welcome[l], text: tutorialStrings.guidesListDesc[l], position: 'right' },
+                { element: '#activity-map-btn', title: tutorialStrings.mapView[l], text: tutorialStrings.mapViewDesc[l], position: 'right' },
+                { element: '#ac-generate-guide-btn', title: tutorialStrings.createAI[l], text: tutorialStrings.aiDesc[l], position: 'right' },
+                { element: '#ac-create-guide-btn', title: tutorialStrings.createManual[l], text: tutorialStrings.manualDesc[l], position: 'right' },
+                { element: '#ac-import-guides-btn', title: tutorialStrings.importer[l], text: tutorialStrings.importerDesc[l], position: 'right' },
+                { element: '#lang-btn', title: tutorialStrings.language[l], text: tutorialStrings.languageDesc[l], position: 'right' },
+                { element: '#auth-container-activity', title: tutorialStrings.session[l], text: tutorialStrings.sessionDesc[l], position: 'right' }
             ];
 
             let currentStep = 0;
