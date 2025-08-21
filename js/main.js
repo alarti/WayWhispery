@@ -14,6 +14,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // -----------------------------------------------------------------------------
+    // Local Database (IndexedDB with Dexie.js)
+    // -----------------------------------------------------------------------------
+    const db = new Dexie('waywhispery_db');
+    db.version(1).stores({
+        guides: 'id, slug, *available_langs', // Primary key 'id', index on 'slug' and 'available_langs'
+        guide_poi: 'id, guide_id' // Primary key 'id', index on 'guide_id'
+    });
+
+    // -----------------------------------------------------------------------------
     // DOM Elements
     // -----------------------------------------------------------------------------
     // Layout
@@ -640,54 +649,56 @@ document.addEventListener('DOMContentLoaded', () => {
             guideCatalogList.innerHTML = '<p>Select a language from the splash screen to see available guides.</p>';
             return;
         }
+        console.log(`Fetching local guides. Language: '${selectedLanguage}'`);
 
-        const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
-        console.log(`Fetching guides. Language: '${selectedLanguage}', Is Editor: ${isEditor}`);
+        try {
+            // Now reading from local Dexie DB
+            const guides = await db.guides
+                .where('available_langs')
+                .equals(selectedLanguage)
+                .toArray();
 
-        let query = supabase.from('guides')
-            .select('id, slug, details, default_lang, available_langs, rating, rating_count')
-            .contains('available_langs', `{${selectedLanguage}}`)
-            .order('rating', { ascending: false }); // Note: 'rating' is the sum, so this is a proxy for popularity
+            // Note: The editor-specific view of drafts is lost in this simple offline model.
+            // That would be part of a more complex sync strategy in Phase 2.
+            // For now, we only show what's been synced (published guides).
 
-        if (isEditor && currentUser) {
-            query = query.or(`author_id.eq.${currentUser.id},status.eq.published`);
-        } else {
-            query = query.eq('status', 'published');
-        }
+            console.log(`Found ${guides.length} guides locally.`);
 
-        const { data: guides, error } = await query;
-
-        console.log("Supabase response received.");
-        console.log("Error object:", error);
-        console.log("Data object:", guides);
-        console.log(`Found ${guides ? guides.length : 0} guides.`);
-
-        if (error) {
-            console.error("Error fetching guides:", error);
+            allFetchedGuides = guides.sort((a, b) => (b.rating / b.rating_count || 0) - (a.rating / a.rating_count || 0));
+            document.getElementById('guide-search-input').value = '';
+            renderGuideList();
+        } catch (error) {
+            console.error("Error fetching guides from local DB:", error);
             guideCatalogList.innerHTML = `<p>Error loading guides.</p>`;
             allFetchedGuides = [];
-            return;
         }
-
-        allFetchedGuides = guides || [];
-        document.getElementById('guide-search-input').value = ''; // Clear search
-        renderGuideList(); // Render the full list
     }
 
     async function loadGuide(slug) {
-        const { data: guideData, error } = await supabase.from('guides').select('*, author:profiles(email)').eq('slug', slug).single();
-        if (error || !guideData) {
-            alert(`Error loading guide: ${error?.message || 'Guide not found.'}`);
+        try {
+            // Fetch guide and its POIs from the local Dexie DB
+            const guideData = await db.guides.get({ slug: slug });
+            if (!guideData) {
+                alert('Guide not found in local database. It might not be published or the app is not synced.');
+                return;
+            }
+
+            const sectionsData = await db.guide_poi
+                .where('guide_id')
+                .equals(guideData.id)
+                .sortBy('order');
+
+            currentGuide = guideData;
+            // The author email is not synced, so we can't display it in offline mode.
+            // A more complex sync would involve a `profiles` table.
+            currentGuide.author = { email: 'Unavailable offline' };
+            pois = sectionsData;
+            tourRoute = pois.map(p => p.id);
+        } catch (error) {
+            console.error("Error loading guide from local DB:", error);
+            alert(`Error loading guide: ${error.message}`);
             return;
         }
-        const { data: sectionsData, error: sectionsError } = await supabase.from('guide_poi').select('*').eq('guide_id', guideData.id).order('order');
-        if (sectionsError) {
-            alert(`Error loading guide POIs: ${sectionsError.message}`);
-            return;
-        }
-        currentGuide = guideData;
-        pois = sectionsData;
-        tourRoute = pois.map(p => p.id);
 
         // Set the initial language for the guide. Prioritize the user's globally selected language.
         if (selectedLanguage && currentGuide.available_langs.includes(selectedLanguage)) {
@@ -1785,6 +1796,9 @@ document.addEventListener('DOMContentLoaded', () => {
             updateLangButton(lang);
             splashLoader.classList.remove('hidden');
 
+            // Attempt to sync with the backend. This will run in the background.
+            syncWithSupabase();
+
             try {
                 // This logic now only runs once on the first app start
                 if(!map) {
@@ -1871,6 +1885,49 @@ document.addEventListener('DOMContentLoaded', () => {
             originalConsole.error(...args);
             args.forEach(arg => createLogMessage(arg, 'error'));
         };
+    }
+
+    async function syncWithSupabase() {
+        if (!navigator.onLine) {
+            console.log("Offline. Skipping sync with Supabase.");
+            return;
+        }
+        console.log("Online. Syncing with Supabase...");
+
+        try {
+            // Fetch all published guides
+            const { data: guides, error: guidesError } = await supabase
+                .from('guides')
+                .select('*')
+                .eq('status', 'published');
+
+            if (guidesError) throw guidesError;
+
+            // Fetch all POIs for the published guides
+            const guideIds = guides.map(g => g.id);
+            const { data: pois, error: poisError } = await supabase
+                .from('guide_poi')
+                .select('*')
+                .in('guide_id', guideIds);
+
+            if (poisError) throw poisError;
+
+            // Use a transaction to clear and bulk-add data
+            await db.transaction('rw', db.guides, db.guide_poi, async () => {
+                // Clear existing data
+                await db.guides.clear();
+                await db.guide_poi.clear();
+
+                // Add new data
+                await db.guides.bulkAdd(guides);
+                await db.guide_poi.bulkAdd(pois);
+            });
+
+            console.log(`Sync complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
+
+        } catch (error) {
+            console.error("Supabase sync failed:", error);
+        }
     }
 
     // Replace direct call with DOMContentLoaded
