@@ -1626,6 +1626,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             function showStep(stepIndex) {
                 const step = steps[stepIndex];
+                console.log(`Showing tutorial step ${stepIndex} for element ${step.element}`);
                 const targetElement = document.querySelector(step.element);
                 if (!targetElement) {
                     console.warn('Tutorial element not found:', step.element);
