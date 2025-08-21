@@ -1526,11 +1526,13 @@ document.addEventListener('DOMContentLoaded', () => {
         updateHeaderControls();
 
         // Safeguard: Before starting, check if the key tutorial element exists.
-        // If not, it means the user is not an editor or the UI hasn't updated.
         if (!document.getElementById('generate-guide-btn')) {
             console.warn("Tutorial skipped: Editor controls not visible.");
             return;
         }
+
+        // Set the view to 'guides' once at the beginning.
+        switchSidebarView('guides');
 
         const steps = [
             {
@@ -1560,11 +1562,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn('Tutorial element not found:', step.element);
                 cleanup();
                 return;
-            }
-
-            // Ensure the view is correct
-            if (step.element === '#logo-btn' || step.element === '#generate-guide-btn' || step.element === '#create-guide-btn') {
-                switchSidebarView('guides');
             }
 
             // Create tooltip
