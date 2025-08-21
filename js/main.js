@@ -528,6 +528,50 @@ document.addEventListener('DOMContentLoaded', () => {
         return error ? null : data;
     }
 
+    function renderStars(ratingSum, ratingCount, guideId) {
+        const averageRating = ratingCount > 0 ? ratingSum / ratingCount : 0;
+        const fullStars = Math.round(averageRating);
+        let starsHTML = '';
+
+        for (let i = 1; i <= 5; i++) {
+            if (i <= fullStars) {
+                starsHTML += `<i class="fas fa-star"></i>`;
+            } else {
+                starsHTML += `<i class="far fa-star"></i>`;
+            }
+        }
+
+        return `<div class="stars">${starsHTML}</div> <span class="rating-count">(${ratingCount})</span>`;
+    }
+
+    async function handleRating(guideId, ratingValue) {
+        const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
+        if (ratedGuides.includes(guideId)) {
+            alert('You have already rated this guide.');
+            return;
+        }
+
+        const { error } = await supabase.rpc('rate_guide', {
+            guide_id_to_rate: guideId,
+            rating_value: ratingValue
+        });
+
+        if (error) {
+            alert(`Error submitting rating: ${error.message}`);
+        } else {
+            alert('Thank you for your rating!');
+            ratedGuides.push(guideId);
+            localStorage.setItem('rated_guides', JSON.stringify(ratedGuides));
+            // Visually disable rating for this guide
+            const starContainer = document.querySelector(`.card[data-guide-id="${guideId}"] .interactive-stars`);
+            if (starContainer) {
+                starContainer.classList.remove('interactive-stars');
+                starContainer.innerHTML = 'Thanks for rating!';
+            }
+            // We could also re-fetch to get the absolute latest average rating
+        }
+    }
+
     function renderGuideList(searchTerm = '') {
         const guidesToRender = searchTerm
             ? allFetchedGuides.filter(guide => {
@@ -543,10 +587,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
         guideCatalogList.innerHTML = '';
         guidesToRender.forEach(guide => {
             const card = document.createElement('div');
             card.className = 'card';
+            card.dataset.guideId = guide.id; // Set guide ID for rating logic
 
             let details_obj = guide.details;
             if (typeof details_obj === 'string') {
@@ -562,9 +608,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const title = guideDetails.title;
             const summary = guideDetails.summary;
 
-            card.innerHTML = `<h5 class="card-title">${title}</h5><p class="card-text">${summary || ''}</p>`;
-            card.addEventListener('click', () => loadGuide(guide.slug));
-            guideCatalogList.appendChild(card);
+            let ratingHTML = `<div class="star-rating">${renderStars(guide.rating, guide.rating_count, guide.id)}</div>`;
+            if (!ratedGuides.includes(guide.id)) {
+                let interactiveStarsHTML = '';
+                for (let i = 1; i <= 5; i++) {
+                    interactiveStarsHTML += `<i class="far fa-star" data-value="${i}"></i>`;
+                }
+                ratingHTML += `<div class="interactive-stars" title="Rate this guide">${interactiveStarsHTML}</div>`;
+            }
+
+            card.innerHTML = `<h5 class="card-title">${title}</h5><p class="card-text">${summary || ''}</p>${ratingHTML}`;
+
+            card.querySelector('.card-title').addEventListener('click', () => loadGuide(guide.slug));
+            card.querySelector('.card-text').addEventListener('click', () => loadGuide(guide.slug));
+
+            const interactiveStarsContainer = card.querySelector('.interactive-stars');
+            if (interactiveStarsContainer) {
+                interactiveStarsContainer.querySelectorAll('i').forEach(star => { // Select all icons
+                    star.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const ratingValue = parseInt(e.target.dataset.value, 10);
+                        handleRating(guide.id, ratingValue);
+                    });
+                });
+            }
         });
     }
 
@@ -576,9 +643,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isEditor = userProfile?.role === 'editor' || userProfile?.role === 'admin';
         let query = supabase.from('guides')
-            .select('slug, details, default_lang, available_langs, rating')
+            .select('*, rating_count') // Select all columns + rating_count
             .contains('available_langs', `{${selectedLanguage}}`)
-            .order('rating', { ascending: false });
+            .order('rating', { ascending: false }); // Note: 'rating' is the sum, so this is a proxy for popularity
 
         if (isEditor && currentUser) {
             query = query.or(`author_id.eq.${currentUser.id},status.eq.published`);
@@ -1537,17 +1604,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 {
                     element: '#logo-btn',
                     title: tutorialStrings.welcome[l],
-                    text: tutorialStrings.guidesList[l]
+                    text: tutorialStrings.guidesList[l],
+                    position: 'right'
                 },
                 {
                     element: '#ac-generate-guide-btn',
                     title: tutorialStrings.createAI[l],
-                    text: tutorialStrings.aiDesc[l]
+                    text: tutorialStrings.aiDesc[l],
+                    position: 'right'
                 },
                 {
                     element: '#ac-create-guide-btn',
                     title: tutorialStrings.createManual[l],
-                    text: tutorialStrings.manualDesc[l]
+                    text: tutorialStrings.manualDesc[l],
+                    position: 'right'
                 }
             ];
 
@@ -1563,6 +1633,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                const arrowClass = step.position === 'right' ? 'left' : 'down';
+
                 // Create tooltip
                 tooltip = document.createElement('div');
                 tooltip.className = 'tooltip-box';
@@ -1573,14 +1645,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="btn-modern btn-modern-secondary" id="skip-tutorial">${tutorialStrings.skip[l]}</button>
                         <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? tutorialStrings.finish[l] : tutorialStrings.next[l]}</button>
                     </div>
-                    <div class="tooltip-arrow down"></div>
+                    <div class="tooltip-arrow ${arrowClass}"></div>
                 `;
                 document.body.appendChild(tooltip);
 
                 // Position tooltip
                 const targetRect = targetElement.getBoundingClientRect();
-                tooltip.style.top = `${targetRect.bottom + 10}px`;
-                tooltip.style.left = `${targetRect.left}px`;
+                if (step.position === 'right') {
+                    tooltip.style.left = `${targetRect.right + 15}px`;
+                    tooltip.style.top = `${targetRect.top}px`;
+                } else { // Default 'down'
+                    tooltip.style.top = `${targetRect.bottom + 10}px`;
+                    tooltip.style.left = `${targetRect.left}px`;
+                }
 
                 // Event listeners
                 tooltip.querySelector('#skip-tutorial').onclick = cleanup;
