@@ -30,6 +30,8 @@ CREATE TABLE guides (
     cover_url TEXT,
     status TEXT CHECK (status IN ('draft', 'published')) DEFAULT 'draft' NOT NULL,
     author_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    rating INT DEFAULT 0,
+    rating_count INT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     initial_lat DOUBLE PRECISION,
@@ -194,7 +196,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, role)
-  VALUES (new.id, new.email, 'viewer');
+  VALUES (new.id, new.email, 'editor');
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -268,3 +270,23 @@ ON CONFLICT (guide_id, "order") DO UPDATE SET
   texts = EXCLUDED.texts,
   lat = EXCLUDED.lat,
   lon = EXCLUDED.lon;
+
+-- -----------------------------------------------------------------------------
+-- Función RPC para puntuar una guía
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION rate_guide(guide_id_to_rate uuid, rating_value int)
+RETURNS void AS $$
+BEGIN
+  -- Validar que el rating esté entre 1 y 5
+  IF rating_value < 1 OR rating_value > 5 THEN
+    RAISE EXCEPTION 'Rating value must be between 1 and 5';
+  END IF;
+
+  -- Actualizar la guía. Se usa 'rating' como la suma total de puntuaciones.
+  UPDATE public.guides
+  SET
+    rating = rating + rating_value,
+    rating_count = rating_count + 1
+  WHERE id = guide_id_to_rate;
+END;
+$$ LANGUAGE plpgsql;

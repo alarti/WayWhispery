@@ -40,6 +40,7 @@ html, body {
 /* --- Activity Bar --- */
 .activity-bar {
     width: 50px;
+    --activity-bar-width: 50px; /* Define variable */
     background-color: #000;
     display: flex;
     flex-direction: column;
@@ -159,6 +160,20 @@ html, body {
     color: var(--ww-text-secondary);
     margin: 0;
 }
+#guide-catalog-list .card.pending-sync {
+    position: relative;
+    border-left: 3px solid var(--ww-accent-yellow);
+}
+#guide-catalog-list .card.pending-sync::after {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f017"; /* Clock icon */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: var(--ww-accent-yellow);
+    opacity: 0.8;
+}
 
 #poi-list {
     list-style: none;
@@ -216,6 +231,15 @@ html, body {
 }
 .btn-group .btn-modern {
     width: auto;
+}
+.btn-group-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 1rem;
+}
+.btn-group-vertical .btn-modern {
+    width: 100%;
 }
 
 /* --- Modal Styles --- */
@@ -448,6 +472,17 @@ html, body {
     max-width: 200px;
 }
 
+.form-switch-container {
+    margin: 1rem 0;
+}
+
+.activity-bar-divider {
+    width: 60%;
+    border: none;
+    border-top: 1px solid var(--ww-border-color);
+    margin: 5px 0;
+}
+
 /* Dropdown Menus in Activity Bar */
 .dropdown-container {
     position: relative;
@@ -458,9 +493,10 @@ html, body {
 .dropdown-menu {
     display: none; /* Hidden by default */
     position: absolute;
-    left: var(--activity-bar-width); /* Position next to the activity bar */
+    left: 50px; /* Position next to the activity bar */
     top: 0;
-    background-color: #f9f9f9;
+    background-color: var(--ww-panel-bg);
+    border: 1px solid var(--ww-border-color);
     min-width: 200px;
     box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
     z-index: 1000;
@@ -469,15 +505,22 @@ html, body {
     text-align: left;
 }
 
+/* For menus at the bottom of the activity bar, make them open upwards */
+#lang-menu-container .dropdown-menu,
+#auth-container-activity .dropdown-menu {
+    top: auto;
+    bottom: 0;
+}
+
 .dropdown-menu.visible {
     display: block;
 }
 
 .dropdown-menu .user-email {
-    color: #333;
+    color: var(--ww-text-light);
     font-weight: bold;
     padding-bottom: 8px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--ww-border-color);
     margin-bottom: 8px;
     display: block;
     white-space: normal;
@@ -489,8 +532,9 @@ html, body {
     padding: 8px 12px;
     background: none;
     border: none;
-    color: #333;
+    color: var(--ww-text-light);
     cursor: pointer;
+    border-radius: 4px;
 }
 
 .dropdown-menu .logout-btn:hover {
@@ -501,6 +545,20 @@ html, body {
 .splash-footer .dropdown-menu {
     top: auto;
     bottom: 50px; /* Position above the splash footer button */
+    left: 50%;
+    transform: translateX(-50%);
+}
+.tooltip-arrow.left {
+    border-width: 10px 10px 10px 0;
+    border-color: transparent var(--ww-green-light) transparent transparent;
+    top: 50%;
+    right: 100%; /* Changed from left to right */
+    transform: translateY(-50%);
+}
+.tooltip-arrow.up {
+    border-width: 0 10px 10px 10px;
+    border-color: transparent transparent var(--ww-green-light) transparent;
+    bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
 }
@@ -532,4 +590,145 @@ html, body {
     height: 28px;
     border-radius: 5px;
     object-fit: cover;
+}
+
+#online-status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+    border: 2px solid #000;
+    transition: background-color 0.3s;
+}
+#online-status-indicator.online {
+    background-color: #4CAF50; /* Green */
+}
+#online-status-indicator.offline {
+    background-color: #757575; /* Gray */
+}
+
+/* --- Mobile Debug Console Styles --- */
+#mobile-console-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    z-index: 1998;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+#mobile-console {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40%;
+    background-color: rgba(24, 36, 36, 0.95);
+    backdrop-filter: blur(5px);
+    border-top: 1px solid var(--ww-border-color);
+    z-index: 1999;
+    display: flex;
+    flex-direction: column;
+    color: white;
+}
+
+.mobile-console-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: var(--ww-panel-bg);
+    flex-shrink: 0;
+}
+.mobile-console-header h4 {
+    margin: 0;
+}
+
+#mobile-console-content {
+    padding: 10px;
+    overflow-y: auto;
+    flex-grow: 1;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+#mobile-console-content p {
+    margin: 0 0 5px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--ww-border-color);
+    word-break: break-all;
+}
+.log-warn {
+    color: #FFD700; /* Yellow */
+}
+.log-error {
+    color: #E57373; /* Red */
+}
+
+/* --- Star Rating Styles --- */
+.star-rating {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+}
+.star-rating .stars {
+    color: var(--ww-accent-yellow);
+}
+.star-rating .stars .fa-star-o { /* Empty star for interactive rating */
+    cursor: pointer;
+}
+.star-rating .rating-count {
+    font-size: 0.8rem;
+    color: var(--ww-text-secondary);
+}
+
+/* --- Tutorial Tooltip Styles --- */
+.tooltip-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2999; /* Below the tooltip itself */
+}
+
+.tooltip-box {
+    position: absolute;
+    background-color: var(--ww-green-light);
+    color: var(--ww-bg-dark);
+    padding: 1rem;
+    border-radius: 8px;
+    z-index: 3000;
+    width: 300px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    transition: opacity 0.2s ease-in-out;
+}
+.tooltip-box h4 {
+    margin-top: 0;
+    color: #000;
+}
+.tooltip-arrow {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+}
+.tooltip-arrow.down {
+    border-width: 10px 10px 0 10px;
+    border-color: var(--ww-green-light) transparent transparent transparent;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.tooltip-actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
 }

@@ -37,6 +37,12 @@
                 <img src="https://flagcdn.com/w40/cn.png" alt="中文" class="flag-icon" data-lang="zh" title="中文">
             </div>
         </div>
+        <div class="form-switch-container">
+            <div class="form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="tutorial-toggle" checked>
+                <label class="form-check-label" for="tutorial-toggle">Asistente de Ayuda</label>
+            </div>
+        </div>
         <div id="splash-loader" class="loader hidden"></div>
 
         <!-- Auth & Support Container -->
@@ -57,8 +63,22 @@
             <button id="logo-btn" class="activity-btn" title="Show Guides">
                 <img src="assets/icons/waywispery-icon.jpeg" alt="Logo" id="activity-bar-logo">
             </button>
+
+            <!-- Main Actions -->
             <button id="activity-map-btn" class="activity-btn" title="Map Details"><i class="fas fa-map-marked-alt"></i></button>
+
+            <!-- Editor Actions -->
+            <div id="editor-actions-activity-bar" class="hidden">
+                <hr class="activity-bar-divider">
+                <button id="ac-generate-guide-btn" class="activity-btn" title="Generate Guide with AI"><i class="fas fa-magic"></i></button>
+                <button id="ac-create-guide-btn" class="activity-btn" title="New Guide"><i class="fas fa-plus"></i></button>
+                <button id="ac-import-guides-btn" class="activity-btn" title="Import Guides"><i class="fas fa-file-import"></i></button>
+                <button id="ac-export-all-btn" class="activity-btn" title="Export All Guides"><i class="fas fa-file-export"></i></button>
+            </div>
+
             <div class="spacer"></div>
+
+            <!-- Bottom Actions -->
             <div id="lang-menu-container" class="dropdown-container">
                 <button id="lang-btn" class="activity-btn" title="Change Language"></button>
                 <div class="dropdown-menu" id="lang-menu">
@@ -68,6 +88,7 @@
             <div id="auth-container-activity" class="dropdown-container">
                 <!-- Auth content will be injected here -->
             </div>
+            <div id="online-status-indicator" title="Connection Status"></div>
         </div>
 
         <!-- Sidebar -->
@@ -82,8 +103,13 @@
 
             <!-- Guides View -->
             <div id="sidebar-guides-view" class="sidebar-view active">
-                <div id="guide-catalog-list" class="sidebar-content">
-                    <!-- List of guides will be populated here -->
+                <div class="sidebar-content">
+                    <div class="search-container">
+                        <input type="text" id="guide-search-input" placeholder="Search guides..." class="form-control">
+                    </div>
+                    <div id="guide-catalog-list">
+                        <!-- List of guides will be populated here -->
+                    </div>
                 </div>
             </div>
 
@@ -92,6 +118,10 @@
                 <div class="sidebar-content">
                     <div id="guide-meta-container">
                         <p class="text-muted">by <span id="author-name"></span></p>
+                    </div>
+                    <div id="guide-language-switcher-container" class="hidden">
+                        <label for="guide-language-select">Guide Language:</label>
+                        <select id="guide-language-select" class="form-select"></select>
                     </div>
                     <hr>
                     <div class="sidebar-controls">
@@ -138,7 +168,21 @@
 
     <input type="file" id="import-guides-input" accept=".json" style="display: none;">
 
+    <!-- Mobile Debug Console -->
+    <button id="mobile-console-toggle" class="btn-modern"><i class="fas fa-bug"></i></button>
+    <div id="mobile-console" class="hidden">
+        <div class="mobile-console-header">
+            <h4>Debug Console</h4>
+            <div>
+                <button id="mobile-console-clear" class="btn-modern btn-modern-sm btn-modern-secondary">Clear</button>
+                <button id="mobile-console-close" class="btn-modern btn-modern-sm btn-modern-danger">&times;</button>
+            </div>
+        </div>
+        <div id="mobile-console-content"></div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
