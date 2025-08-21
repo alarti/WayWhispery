@@ -1590,6 +1590,7 @@ document.addEventListener('DOMContentLoaded', () => {
         languageDesc: { en: 'Change the application language and the language for filtering guides.', es: 'Cambia el idioma de la aplicación y el idioma para filtrar las guías.', fr: 'Changez la langue de l\'application et la langue de filtrage des guides.', de: 'Ändern Sie die Anwendungssprache und die Sprache zum Filtern der Anleitungen.', zh: '更改应用程序语言和筛选指南的语言。' },
         sessionDesc: { en: 'Here you can see your user information and log out.', es: 'Aquí puedes ver la información de tu usuario y cerrar sesión.', fr: 'Ici, vous pouvez voir vos informations utilisateur et vous déconnecter.', de: 'Hier können Sie Ihre Benutzerinformationen einsehen und sich abmelden.', zh: '在这里您可以看到您的用户信息并注销。' },
         // Buttons
+        back: { en: 'Back', es: 'Atrás', fr: 'Retour', de: 'Zurück', zh: '返回' },
         skip: { en: 'Skip', es: 'Saltar', fr: 'Passer', de: 'Überspringen', zh: '跳过' },
         next: { en: 'Next', es: 'Siguiente', fr: 'Suivant', de: 'Weiter', zh: '下一个' },
         finish: { en: 'Finish', es: 'Terminar', fr: 'Terminer', de: 'Fertig', zh: '完成' }
@@ -1617,8 +1618,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 { element: '#ac-generate-guide-btn', title: tutorialStrings.createAI[l], text: tutorialStrings.aiDesc[l], position: 'right' },
                 { element: '#ac-create-guide-btn', title: tutorialStrings.createManual[l], text: tutorialStrings.manualDesc[l], position: 'right' },
                 { element: '#ac-import-guides-btn', title: tutorialStrings.importer[l], text: tutorialStrings.importerDesc[l], position: 'right' },
-                { element: '#lang-btn', title: tutorialStrings.language[l], text: tutorialStrings.languageDesc[l], position: 'right' },
-                { element: '#auth-container-activity', title: tutorialStrings.session[l], text: tutorialStrings.sessionDesc[l], position: 'right' }
+                { element: '#lang-btn', title: tutorialStrings.language[l], text: tutorialStrings.languageDesc[l], position: 'top' },
+                { element: '#auth-container-activity', title: tutorialStrings.session[l], text: tutorialStrings.sessionDesc[l], position: 'top' }
             ];
 
             let currentStep = 0;
@@ -1634,34 +1635,61 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const arrowClass = step.position === 'right' ? 'left' : 'down';
+                const arrowClass = {
+                    right: 'left',
+                    top: 'up',
+                    down: 'down'
+                }[step.position] || 'down';
 
                 // Create tooltip
                 tooltip = document.createElement('div');
                 tooltip.className = 'tooltip-box';
+                const backButtonHTML = stepIndex > 0 ? `<button class="btn-modern btn-modern-secondary" id="back-tutorial">${tutorialStrings.back[l]}</button>` : '';
+
                 tooltip.innerHTML = `
                     <h4>${step.title}</h4>
                     <p>${step.text}</p>
                     <div class="tooltip-actions">
                         <button class="btn-modern btn-modern-secondary" id="skip-tutorial">${tutorialStrings.skip[l]}</button>
-                        <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? tutorialStrings.finish[l] : tutorialStrings.next[l]}</button>
+                        <div>
+                            ${backButtonHTML}
+                            <button class="btn-modern" id="next-tutorial">${stepIndex === steps.length - 1 ? tutorialStrings.finish[l] : tutorialStrings.next[l]}</button>
+                        </div>
                     </div>
                     <div class="tooltip-arrow ${arrowClass}"></div>
                 `;
+                tooltip.style.opacity = '0'; // Hide for positioning
                 document.body.appendChild(tooltip);
 
                 // Position tooltip
                 const targetRect = targetElement.getBoundingClientRect();
-                if (step.position === 'right') {
-                    tooltip.style.left = `${targetRect.right + 15}px`;
-                    tooltip.style.top = `${targetRect.top}px`;
-                } else { // Default 'down'
-                    tooltip.style.top = `${targetRect.bottom + 10}px`;
-                    tooltip.style.left = `${targetRect.left}px`;
+                const tooltipRect = tooltip.getBoundingClientRect(); // Now has dimensions
+
+                switch (step.position) {
+                    case 'right':
+                        tooltip.style.left = `${targetRect.right + 15}px`;
+                        tooltip.style.top = `${targetRect.top + (targetRect.height / 2) - (tooltipRect.height / 2)}px`;
+                        break;
+                    case 'top':
+                        tooltip.style.left = `${targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2)}px`;
+                        tooltip.style.top = `${targetRect.top - tooltipRect.height - 15}px`;
+                        break;
+                    default: // 'down'
+                        tooltip.style.top = `${targetRect.bottom + 10}px`;
+                        tooltip.style.left = `${targetRect.left}px`;
+                        break;
                 }
+                tooltip.style.opacity = '1'; // Make it visible
 
                 // Event listeners
                 tooltip.querySelector('#skip-tutorial').onclick = cleanup;
+                if (stepIndex > 0) {
+                    tooltip.querySelector('#back-tutorial').onclick = () => {
+                        currentStep--;
+                        tooltip.remove();
+                        showStep(currentStep);
+                    };
+                }
                 tooltip.querySelector('#next-tutorial').onclick = () => {
                     currentStep++;
                     if (currentStep >= steps.length) {

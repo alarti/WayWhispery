@@ -541,6 +541,13 @@ html, body {
     right: 100%; /* Changed from left to right */
     transform: translateY(-50%);
 }
+.tooltip-arrow.up {
+    border-width: 0 10px 10px 10px;
+    border-color: transparent transparent var(--ww-green-light) transparent;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+}
 
 /* JSON Preview in Modal */
 .json-preview {
@@ -609,6 +616,7 @@ html, body {
     z-index: 3000;
     width: 300px;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    transition: opacity 0.2s ease-in-out;
 }
 .tooltip-box h4 {
     margin-top: 0;
