@@ -1525,6 +1525,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // First, ensure the header controls are visible for the tutorial to find them.
         updateHeaderControls();
 
+        // Safeguard: Before starting, check if the key tutorial element exists.
+        // If not, it means the user is not an editor or the UI hasn't updated.
+        if (!document.getElementById('generate-guide-btn')) {
+            console.warn("Tutorial skipped: Editor controls not visible.");
+            return;
+        }
+
         const steps = [
             {
                 element: '#logo-btn',
