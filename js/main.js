@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     db.version(3).stores({
         guides: 'id, slug, *available_langs', // Primary key 'id', index on 'slug' and 'available_langs'
         guide_poi: 'id, guide_id', // Primary key 'id', index on 'guide_id'
-        mutations: '++id, error_count' // Auto-incrementing PK, index on error_count for querying failed mutations
+        mutations: '++id, createdAt, error_count' // Auto-incrementing PK, index on createdAt and error_count
     });
 
     // -----------------------------------------------------------------------------
