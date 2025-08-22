@@ -1,6 +1,8 @@
 # WayWhispery - Interactive Guide Platform
 
 This project is an advanced, offline-first Progressive Web App (PWA) that serves as a platform for creating, sharing, and experiencing interactive, multilingual voice guides for any location worldwide. It combines a Leaflet.js map interface with a Supabase backend for data persistence and authentication.
+<img width="1911" height="943" alt="image" src="https://github.com/user-attachments/assets/b55478d6-ab3e-45ee-90f7-26e9cc95f5dd" />
+
 
 ## Features
 
