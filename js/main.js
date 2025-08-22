@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     importGuides(e.target.result);
                 } catch (error) {
-                    alert(`Error parsing JSON file: ${error.message}`);
+                    showMessageDialog(`Error parsing JSON file: ${error.message}`, 'error');
                 }
             };
             reader.readAsText(file);
@@ -424,11 +424,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (geolocationId) navigator.geolocation.clearWatch(geolocationId);
         if (navigator.geolocation) {
             geolocationId = navigator.geolocation.watchPosition(showPosition,
-                (err) => { alert(`GPS Error: ${err.message}`); },
+                (err) => { showMessageDialog(`GPS Error: ${err.message}`, 'error'); },
                 { enableHighAccuracy: true }
             );
         } else {
-            alert("Geolocation is not supported by this browser.");
+            showMessageDialog("Geolocation is not supported by this browser.", 'error');
         }
     }
 
@@ -583,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleRating(guideId, ratingValue) {
         const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
         if (ratedGuides.includes(guideId)) {
-            alert('You have already rated this guide.');
+            showMessageDialog('You have already rated this guide.', 'info');
             return;
         }
 
@@ -595,10 +595,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (error) {
-                alert(`Error submitting rating: ${error.message}`);
+                showMessageDialog(`Error submitting rating: ${error.message}`, 'error');
                 return; // Don't proceed if there was an error
             } else {
-                alert('Thank you for your rating!');
+                showMessageDialog('Thank you for your rating!', 'success');
             }
         } else {
             // Offline: Add to mutations outbox
@@ -607,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload: { guideId, ratingValue },
                 createdAt: new Date()
             });
-            alert('You are offline. Your rating has been saved and will be submitted when you reconnect.');
+            showMessageDialog('You are offline. Your rating has been saved and will be submitted when you reconnect.', 'info');
         }
 
         // In both cases, mark as rated locally to prevent re-rating
@@ -733,7 +733,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fetch guide and its POIs from the local Dexie DB
             const guideData = await db.guides.get({ slug: slug });
             if (!guideData) {
-                alert('Guide not found in local database. It might not be published or the app is not synced.');
+                showMessageDialog('Guide not found in local database. It might not be published or the app is not synced.', 'error');
                 return;
             }
 
@@ -750,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tourRoute = pois.map(p => p.id);
         } catch (error) {
             console.error("Error loading guide from local DB:", error);
-            alert(`Error loading guide: ${error.message}`);
+            showMessageDialog(`Error loading guide: ${error.message}`, 'error');
             return;
         }
 
@@ -910,7 +910,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="form-group"><label for="description">Description</label><textarea name="description" rows="3"></textarea></div>
                 <button type="submit" class="btn-modern">Add POI</button>
             </form>`, (data) => {
-            const newPoi = { id: `temp-${Date.now()}`, lat, lon: lng, name: data.name, description: data.description };
+            const newPoi = {
+                id: `temp-${Date.now()}`,
+                lat,
+                lon: lng,
+                texts: {
+                    [currentGuide.current_lang]: { title: data.name, description: data.description }
+                },
+                // For immediate UI refresh
+                name: data.name,
+                description: data.description
+            };
             pois.push(newPoi);
             tourRoute.push(newPoi.id);
             renderPois();
@@ -980,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button type="submit" class="btn-modern">Create and Edit</button>
             </form>`, async (data) => {
             if (!selectedLanguage) {
-                alert("A language must be selected to create a guide.");
+                showMessageDialog("A language must be selected to create a guide.", 'error');
                 return false;
             }
 
@@ -1011,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Online: Insert into Supabase, then update local
                 const { data: guideData, error } = await supabase.from('guides').insert(newGuideData).select().single();
                 if (error) {
-                    alert(`Error creating guide: ${error.message}`);
+                    showMessageDialog(`Error creating guide: ${error.message}`, 'error');
                     return false;
                 }
                 await db.guides.put(guideData); // Use put to add/update local
@@ -1024,7 +1034,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload: newGuideData,
                     createdAt: new Date()
                 });
-                alert('You are offline. Guide created locally and will be synced when you reconnect.');
+                showMessageDialog('You are offline. Guide created locally and will be synced when you reconnect.', 'info');
                 await loadGuide(newGuideData.slug);
             }
 
@@ -1059,10 +1069,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 await db.guide_poi.bulkPut(sectionsToSave);
 
                 poisToDelete = [];
-                alert('Guide saved successfully!');
+                showMessageDialog('Guide saved successfully!', 'success');
 
             } catch (error) {
-                alert(`Error saving guide online: ${error.message}`);
+                showMessageDialog(`Error saving guide online: ${error.message}`, 'error');
                 return;
             }
 
@@ -1095,10 +1105,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 poisToDelete = [];
-                alert('You are offline. Guide changes saved locally and will be synced when you reconnect.');
+                showMessageDialog('You are offline. Guide changes saved locally and will be synced when you reconnect.', 'info');
 
             } catch (error) {
-                alert(`Error saving guide offline: ${error.message}`);
+                showMessageDialog(`Error saving guide offline: ${error.message}`, 'error');
                 return;
             }
         }
@@ -1145,15 +1155,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 .select();
 
             if (error) {
-                alert(`Error updating guide: ${error.message}`);
+                showMessageDialog(`Error updating guide: ${error.message}`, 'error');
                 return false;
             }
             if (!responseData || responseData.length === 0) {
-                alert("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                showMessageDialog("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.", 'error');
                 return false;
             }
 
-            alert('Guide details saved!');
+            showMessageDialog('Guide details saved!', 'success');
             await loadGuide(currentGuide.slug); // Reload to see changes
             return true;
         });
@@ -1171,7 +1181,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (navigator.onLine) {
             const { error } = await supabase.from('guides').delete().eq('id', guideId);
             if (error) {
-                alert(`Error deleting guide: ${error.message}`);
+                showMessageDialog(`Error deleting guide: ${error.message}`, 'error');
                 return;
             }
         } else {
@@ -1186,7 +1196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await db.guides.delete(guideId);
         await db.guide_poi.where('guide_id').equals(guideId).delete();
 
-        alert('Guide deleted. It will be removed permanently on next sync if you are offline.');
+        showMessageDialog('Guide deleted. It will be removed permanently on next sync if you are offline.', 'info');
         window.location.reload();
     }
 
@@ -1221,7 +1231,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error("Invalid JSON format: 'guides' array not found.");
             }
         } catch (error) {
-            alert(`Error reading file: ${error.message}`);
+            showMessageDialog(`Error reading file: ${error.message}`, 'error');
             return;
         }
 
@@ -1284,7 +1294,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             hideFormModal();
-            alert('Import complete! Refreshing guides...');
+            showMessageDialog('Import complete! Refreshing guides...', 'success');
             // Sync with Supabase to get all the latest changes into the local DB
             await syncWithSupabase();
             // Switch to the guides view to see the result
@@ -1292,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             hideFormModal();
-            alert(`An error occurred during import: ${error.message}`);
+            showMessageDialog(`An error occurred during import: ${error.message}`, 'error');
             console.error(error);
         }
     }
@@ -1454,12 +1464,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- Step 3: Show Preview ---
             updateLoaderModal('Generating Guide...', 'Step 3 of 3: Preparing preview...');
+            // After the loop, clean up the temporary field before showing the user
+            guide.pois.forEach(p => delete p.location_context);
+
             hideFormModal();
             showJsonPreviewModal(JSON.stringify(guideData));
 
         } catch (error) {
             hideFormModal();
-            alert(`AI guide generation failed: ${error.message}`);
+            showMessageDialog(`AI guide generation failed: ${error.message}`, 'error');
             console.error(error);
         }
     }
@@ -1512,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 downloadJson(JSON.parse(editedJson), 'ai-generated-guide.json');
             } catch (error) {
-                alert(`Cannot export invalid JSON. Please fix the errors first.\nError: ${error.message}`);
+                showMessageDialog(`Cannot export invalid JSON. Please fix the errors first.\nError: ${error.message}`, 'error');
             }
         });
     }
@@ -1529,7 +1542,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!optionsHTML) {
-            alert("This guide has already been translated into all supported languages.");
+            showMessageDialog("This guide has already been translated into all supported languages.", 'info');
             return;
         }
 
@@ -1591,7 +1604,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             hideFormModal();
-            alert(`Translation failed: ${error.message}`);
+            showMessageDialog(`Translation failed: ${error.message}`, 'error');
         }
     }
 
@@ -1678,12 +1691,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             hideFormModal();
-            alert(`Successfully created new guide: "${details.title}". It is saved as a draft.`);
+            showMessageDialog(`Successfully created new guide: "${details.title}". It is saved as a draft.`, 'success');
             window.location.reload(); // Reload to see the new guide in the list
 
         } catch (error) {
             hideFormModal();
-            alert(`An error occurred during duplication: ${error.message}`);
+            showMessageDialog(`An error occurred during duplication: ${error.message}`, 'error');
         }
     }
 
@@ -1723,6 +1736,31 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideFormModal() {
         formModal.classList.add('hidden');
         formModalContent.innerHTML = '';
+    }
+
+    function showMessageDialog(message, type = 'info') {
+        const dialog = document.getElementById('message-dialog');
+        const text = document.getElementById('message-dialog-text');
+        const closeBtn = document.getElementById('message-dialog-close');
+
+        text.textContent = message;
+
+        // Remove old type classes
+        dialog.classList.remove('success', 'error', 'info');
+        // Add new type class
+        dialog.classList.add(type);
+
+        dialog.classList.remove('hidden');
+
+        const closeDialog = () => dialog.classList.add('hidden');
+        closeBtn.onclick = closeDialog;
+
+        // Also close if clicking the overlay
+        dialog.onclick = (e) => {
+            if (e.target === dialog) {
+                closeDialog();
+            }
+        };
     }
 
     // -----------------------------------------------------------------------------

@@ -732,3 +732,26 @@ html, body {
     display: flex;
     justify-content: space-between;
 }
+
+/* --- Custom Message Dialog --- */
+#message-dialog .modal-content {
+    max-width: 400px;
+    text-align: center;
+}
+#message-dialog-text {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+}
+#message-dialog-close {
+    width: 100px;
+}
+#message-dialog.success .modal-content {
+    border-left: 5px solid var(--ww-green-dark);
+}
+#message-dialog.error .modal-content {
+    border-left: 5px solid var(--btn-danger-bg);
+}
+#message-dialog.info .modal-content {
+    border-left: 5px solid #3498db; /* A nice blue for info */
+}
