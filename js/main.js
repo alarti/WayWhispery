@@ -1043,6 +1043,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     <label for="description">Description</label>
                     <textarea name="description" rows="3">${texts.description}</textarea>
                 </div>
+                <hr>
+                <div class="form-group">
+                    <label>Find Location</label>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="poi-location-search-input" placeholder="e.g., Eiffel Tower, Paris" style="width: 100%;">
+                        <button type="button" id="poi-location-search-btn" class="btn-modern btn-modern-secondary">Search</button>
+                    </div>
+                    <div id="poi-location-search-results" style="margin-top: 10px; max-height: 150px; overflow-y: auto;"></div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex-grow: 1;">
+                        <label for="lat">Latitude</label>
+                        <input type="number" step="any" name="lat" value="${poi.lat}" required>
+                    </div>
+                    <div class="form-group" style="flex-grow: 1;">
+                        <label for="lon">Longitude</label>
+                        <input type="number" step="any" name="lon" value="${poi.lon}" required>
+                    </div>
+                </div>
                 <button type="submit" class="btn-modern">Save Changes</button>
             </form>`, (data) => {
             // Ensure the texts object for the language exists
@@ -1056,11 +1075,65 @@ document.addEventListener('DOMContentLoaded', () => {
             // Also update the top-level properties for immediate UI refresh
             poi.name = data.name;
             poi.description = data.description;
+            poi.lat = parseFloat(data.lat) || 0.0;
+            poi.lon = parseFloat(data.lon) || 0.0;
+
 
             // Re-render the list to show the new name
             renderPoiList();
-            // No need to re-render all POI markers on the map unless their position changes
+            // The position might have changed, so we need to re-render the markers and the route
+            renderPois();
+            drawTourRoute();
+
             return true;
+        });
+
+        // --- Add event listeners for the new search functionality ---
+        const searchInput = document.getElementById('poi-location-search-input');
+        const searchBtn = document.getElementById('poi-location-search-btn');
+        const resultsContainer = document.getElementById('poi-location-search-results');
+        const latInput = formModalContent.querySelector('input[name="lat"]');
+        const lonInput = formModalContent.querySelector('input[name="lon"]');
+        const provider = new GeoSearch.OpenStreetMapProvider();
+
+        const performSearch = async () => {
+            const query = searchInput.value;
+            if (!query) return;
+            resultsContainer.innerHTML = '<div class="loader-sm"></div>'; // Show a small loader
+            try {
+                const results = await provider.search({ query });
+                resultsContainer.innerHTML = '';
+                if (results && results.length > 0) {
+                    results.slice(0, 5).forEach(result => { // Show top 5 results
+                        const resultDiv = document.createElement('div');
+                        resultDiv.textContent = result.label;
+                        resultDiv.style.padding = '8px';
+                        resultDiv.style.cursor = 'pointer';
+                        resultDiv.style.borderBottom = '1px solid var(--ww-border-color)';
+                        resultDiv.onmouseover = () => resultDiv.style.backgroundColor = 'rgba(102, 205, 170, 0.1)';
+                        resultDiv.onmouseout = () => resultDiv.style.backgroundColor = 'transparent';
+                        resultDiv.addEventListener('click', () => {
+                            latInput.value = result.y;
+                            lonInput.value = result.x;
+                            resultsContainer.innerHTML = ''; // Clear results after selection
+                        });
+                        resultsContainer.appendChild(resultDiv);
+                    });
+                } else {
+                    resultsContainer.textContent = 'No results found.';
+                }
+            } catch (error) {
+                resultsContainer.textContent = 'Search failed.';
+                console.error("Location search failed:", error);
+            }
+        };
+
+        searchBtn.addEventListener('click', performSearch);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performSearch();
+            }
         });
     }
 
