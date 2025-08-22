@@ -1414,25 +1414,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (let i = 0; i < guide.pois.length; i++) {
                 const poi = guide.pois[i];
-                const poiName = poi.texts.en.title;
-                const poiCity = guide.details.en.title.split(' of ').pop(); // Heuristic to get city from title
-                const query = `${poiName}, ${poiCity}`;
+                const poiName = poi.texts.es.title; // Use Spanish title for searching
+                const guideCity = guide.details.es.title.split(' de ').pop(); // Heuristic to get city from Spanish title
+                const query = `${poiName}, ${guideCity}`;
 
-                updateLoaderModal('Correcting Coordinates...', `Searching for: "${poiName}"`);
-                console.log(`[GeoSearch] Searching for: ${query}`);
+                updateLoaderModal('Correcting Coordinates...', `Buscando: "${poiName}"`);
+                console.log(`[GeoSearch] Buscando: ${query}`);
 
                 const results = await geoProvider.search({ query });
                 if (results && results.length > 0) {
                     poi.lat = results[0].y;
                     poi.lon = results[0].x;
-                    console.log(`[GeoSearch] Found: ${poiName} at [${poi.lat}, ${poi.lon}]`);
+                    console.log(`[GeoSearch] Encontrado: ${poiName} en [${poi.lat}, ${poi.lon}]`);
                     // Set the guide's initial location to the first POI's location
                     if (i === 0) {
                         guide.initial_lat = poi.lat;
                         guide.initial_lon = poi.lon;
                     }
                 } else {
-                    console.warn(`[GeoSearch] Could not find coordinates for "${poiName}". Using placeholder 0,0.`);
+                    console.warn(`[GeoSearch] No se encontraron coordenadas para "${poiName}". Usando 0,0 como placeholder.`);
                 }
             }
 
