@@ -277,7 +277,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function renderGuideRatingInDetailsView() {
+        const container = document.getElementById('guide-rating-container');
+        if (!currentGuide) {
+            container.innerHTML = '';
+            container.classList.add('hidden');
+            return;
+        }
+
+        container.innerHTML = ''; // Clear previous content
+        container.classList.remove('hidden');
+
+        const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
+        const isRated = ratedGuides.includes(currentGuide.id);
+
+        let ratingHTML = `<div class="star-rating">${renderStars(currentGuide.rating, currentGuide.rating_count, currentGuide.id)}</div>`;
+
+        if (isRated) {
+            ratingHTML += `<p class="text-muted small" style="margin-top: 5px;">You have already rated this guide.</p>`;
+        } else {
+            let interactiveStarsHTML = '';
+            for (let i = 1; i <= 5; i++) {
+                interactiveStarsHTML += `<i class="far fa-star" data-value="${i}"></i>`;
+            }
+            ratingHTML += `<div class="interactive-stars" title="Rate this guide">${interactiveStarsHTML}</div>`;
+        }
+
+        container.innerHTML = ratingHTML;
+
+        if (!isRated) {
+            container.querySelectorAll('.interactive-stars i').forEach(star => {
+                star.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const ratingValue = parseInt(e.target.dataset.value, 10);
+                    const success = await handleRating(currentGuide.id, ratingValue);
+                    if (success) {
+                        // Optimistically update the guide object
+                        currentGuide.rating_count = (currentGuide.rating_count || 0) + 1;
+                        currentGuide.rating = (currentGuide.rating || 0) + ratingValue;
+                        // Re-render the rating section
+                        renderGuideRatingInDetailsView();
+                    }
+                });
+            });
+        }
+    }
+
     function updateMapView() {
+        const guideRatingContainer = document.getElementById('guide-rating-container');
         if (currentGuide) {
             // Rerender text content based on the current language
             renderGuideText(currentGuide.current_lang);
@@ -287,10 +334,15 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPois();
             drawTourRoute();
             renderLanguageSwitcher(); // New function call
+            renderGuideRatingInDetailsView(); // Render the rating stars
         } else {
             sidebarViewTitle.textContent = 'All Guides';
             authorNameSpan.textContent = '';
             guideMetaContainer.classList.add('hidden');
+            if (guideRatingContainer) {
+                guideRatingContainer.innerHTML = '';
+                guideRatingContainer.classList.add('hidden');
+            }
             document.getElementById('guide-language-switcher-container').classList.add('hidden');
             poiList.innerHTML = '';
         }
@@ -588,11 +640,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
         if (ratedGuides.includes(guideId)) {
             await showMessageDialog('You have already rated this guide.', 'info');
-            return;
+            return false; // Indicate that rating did not proceed
         }
 
+        let success = false;
         if (navigator.onLine) {
-            // Online: Call RPC directly
             const { error } = await supabase.rpc('rate_guide', {
                 guide_id_to_rate: guideId,
                 rating_value: ratingValue
@@ -600,29 +652,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (error) {
                 await showMessageDialog(`Error submitting rating: ${error.message}`, 'error');
-                return; // Don't proceed if there was an error
             } else {
                 await showMessageDialog('Thank you for your rating!', 'success');
+                success = true;
             }
         } else {
-            // Offline: Add to mutations outbox
             await db.mutations.add({
                 type: 'rate_guide',
                 payload: { guideId, ratingValue },
                 createdAt: new Date()
             });
             await showMessageDialog('You are offline. Your rating has been saved and will be submitted when you reconnect.', 'info');
+            success = true;
         }
 
-        // In both cases, mark as rated locally to prevent re-rating
-        ratedGuides.push(guideId);
-        localStorage.setItem('rated_guides', JSON.stringify(ratedGuides));
-
-        // Visually disable rating for this guide
-        const starContainer = document.querySelector(`.card[data-guide-id="${guideId}"] .interactive-stars`);
-        if (starContainer) {
-            starContainer.parentElement.innerHTML = 'Thanks for rating!';
+        if (success) {
+            ratedGuides.push(guideId);
+            localStorage.setItem('rated_guides', JSON.stringify(ratedGuides));
         }
+
+        return success; // Return true if the rating was accepted
     }
 
     async function renderGuideList(searchTerm = '') {
@@ -691,11 +740,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const interactiveStarsContainer = card.querySelector('.interactive-stars');
             if (interactiveStarsContainer) {
-                interactiveStarsContainer.querySelectorAll('i').forEach(star => { // Select all icons
-                    star.addEventListener('click', (e) => {
+                interactiveStarsContainer.querySelectorAll('i').forEach(star => {
+                    star.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         const ratingValue = parseInt(e.target.dataset.value, 10);
-                        handleRating(guide.id, ratingValue);
+                        const success = await handleRating(guide.id, ratingValue);
+                        if (success) {
+                            // Optimistically update guide data in the main array
+                            const ratedGuide = allFetchedGuides.find(g => g.id === guide.id);
+                            if (ratedGuide) {
+                                ratedGuide.rating_count = (ratedGuide.rating_count || 0) + 1;
+                                ratedGuide.rating = (ratedGuide.rating || 0) + ratingValue;
+                            }
+                            // Visually update just this card's rating
+                            const ratingContainer = card.querySelector('.star-rating');
+                            if (ratingContainer) {
+                                ratingContainer.innerHTML = renderStars(guide.rating, guide.rating_count, guide.id);
+                            }
+                            interactiveStarsContainer.innerHTML = 'Thanks for rating!';
+                            interactiveStarsContainer.style.pointerEvents = 'none';
+                        }
                     });
                 });
             }
@@ -1060,9 +1124,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function saveGuide() {
-        if (navigator.onLine) {
-            // ONLINE: Perform operations on Supabase first, then sync to local
-            try {
+        const saveBtn = document.getElementById('save-guide-btn');
+        if (!saveBtn) return;
+
+        const originalBtnHTML = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; // Spinner icon
+
+        let success = false;
+        let errorMessage = '';
+
+        try {
+            if (navigator.onLine) {
+                // ONLINE: Perform operations on Supabase first, then sync to local
                 if (poisToDelete.length > 0) {
                     await supabase.from('guide_poi').delete().in('id', poisToDelete);
                 }
@@ -1079,28 +1153,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Now sync local DB
-                if (poisToDelete.length > 0) {
-                    await db.guide_poi.bulkDelete(poisToDelete);
-                }
-                await db.guide_poi.bulkPut(sectionsToSave);
+                if (poisToDelete.length > 0) await db.guide_poi.bulkDelete(poisToDelete);
+                if (sectionsToSave.length > 0) await db.guide_poi.bulkPut(sectionsToSave);
 
-                poisToDelete = [];
-                await showMessageDialog('Guide saved successfully!', 'success');
-
-            } catch (error) {
-                await showMessageDialog(`Error saving guide online: ${error.message}`, 'error');
-                return;
-            }
-
-        } else {
-            // OFFLINE: Perform operations on local DB and queue mutations
-            try {
+            } else {
+                // OFFLINE: Perform operations on local DB and queue mutations
                 const mutations = [];
-                // Queue deletions
                 poisToDelete.forEach(id => {
                     mutations.push({ type: 'poi_delete', payload: { id: id, guide_id: currentGuide.id }, createdAt: new Date() });
                 });
-                // Queue upserts
                 const sectionsToSave = pois.map((poi, index) => ({
                     id: poi.id.startsWith('temp-') ? crypto.randomUUID() : poi.id,
                     guide_id: currentGuide.id,
@@ -1113,22 +1174,39 @@ document.addEventListener('DOMContentLoaded', () => {
                     mutations.push({ type: 'poi_upsert', payload: poi, createdAt: new Date() });
                 });
 
-                // Apply changes locally and add mutations to outbox
                 await db.transaction('rw', db.guide_poi, db.mutations, async () => {
                     if (poisToDelete.length > 0) await db.guide_poi.bulkDelete(poisToDelete);
                     if (sectionsToSave.length > 0) await db.guide_poi.bulkPut(sectionsToSave);
                     if (mutations.length > 0) await db.mutations.bulkAdd(mutations);
                 });
-
-                poisToDelete = [];
-                await showMessageDialog('You are offline. Guide changes saved locally and will be synced when you reconnect.', 'info');
-
-            } catch (error) {
-                await showMessageDialog(`Error saving guide offline: ${error.message}`, 'error');
-                return;
             }
+
+            poisToDelete = [];
+            success = true;
+
+        } catch (error) {
+            errorMessage = error.message;
+            console.error("Error saving guide:", error);
         }
-        await loadGuide(currentGuide.slug); // Reload to get fresh data
+
+        if (success) {
+            saveBtn.innerHTML = '<i class="fas fa-check"></i>'; // Checkmark icon
+            await showMessageDialog(
+                navigator.onLine ? 'Guide saved successfully!' : 'You are offline. Guide changes saved locally.',
+                navigator.onLine ? 'success' : 'info'
+            );
+            // Reload guide data after showing message
+            await loadGuide(currentGuide.slug);
+        } else {
+            saveBtn.innerHTML = '<i class="fas fa-times"></i>'; // Error icon
+            await showMessageDialog(`Error saving guide: ${errorMessage}`, 'error');
+        }
+
+        // Restore button after a delay
+        setTimeout(() => {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalBtnHTML;
+        }, 2000);
     }
 
     function showGuideDetailsForm() {
@@ -1461,25 +1539,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (let i = 0; i < guide.pois.length; i++) {
                 const poi = guide.pois[i];
-                const poiName = poi.texts.es.title;
+                const poiName = poi.texts.en.title; // Use English title for better geocoding results
                 const locationContext = poi.location_context || ''; // Use the new field
                 const query = `${poiName}, ${locationContext}`;
 
-                updateLoaderModal('Correcting Coordinates...', `Buscando: "${poiName}"`);
-                console.log(`[GeoSearch] Buscando: ${query}`);
+                updateLoaderModal('Correcting Coordinates...', `Searching for: "${query}"`);
+                console.log(`[GeoSearch] Searching for: ${query}`);
 
                 const results = await geoProvider.search({ query });
                 if (results && results.length > 0) {
                     poi.lat = results[0].y;
                     poi.lon = results[0].x;
-                    console.log(`[GeoSearch] Encontrado: ${poiName} en [${poi.lat}, ${poi.lon}]`);
+                    console.log(`[GeoSearch] Found: ${poiName} at [${poi.lat}, ${poi.lon}]`);
                     // Set the guide's initial location to the first POI's location
                     if (i === 0) {
                         guide.initial_lat = poi.lat;
                         guide.initial_lon = poi.lon;
                     }
                 } else {
-                    console.warn(`[GeoSearch] No se encontraron coordenadas para "${query}". Usando 0,0 como placeholder.`);
+                    console.warn(`[GeoSearch] No coordinates found for "${query}". Using 0,0 as placeholder.`);
                 }
             }
 
