@@ -1,5 +1,5 @@
 /* Author: Alberto Arce, Arcasoft (Updated by Jules) */
-const CACHE_NAME = 'waywispery-v2';
+const CACHE_NAME = 'waywispery-v3';
 const urlsToCache = [
     // Core App Shell
     '/',
@@ -14,6 +14,8 @@ const urlsToCache = [
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
     'https://unpkg.com/dexie@latest/dist/dexie.js',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css',
+    'https://unpkg.com/leaflet-geosearch@3.8.0/dist/geosearch.css',
+    'https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js',
     // Font Awesome Webfonts (critical for offline icons)
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/webfonts/fa-solid-900.woff2',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/webfonts/fa-regular-400.woff2',

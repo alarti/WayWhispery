@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isEditMode = false;
     let selectedLanguage = null;
     let poisToDelete = [];
+    let searchControl = null;
 
     const uiStrings = {
         allGuides: { en: 'All Guides', es: 'Todas las Guías', fr: 'Tous les Guides', de: 'Alle Anleitungen', zh: '所有指南' },
@@ -371,6 +372,31 @@ document.addEventListener('DOMContentLoaded', () => {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
+
+        // Initialize the GeoSearch control
+        const provider = new GeoSearch.OpenStreetMapProvider();
+        searchControl = new GeoSearch.GeoSearchControl({
+            provider: provider,
+            style: 'bar', // 'bar' or 'button'
+            showMarker: true,
+            showPopup: false,
+            autoClose: true,
+            retainZoomLevel: false,
+            animateZoom: true,
+            keepResult: true,
+        });
+
+        map.on('geosearch/showlocation', (result) => {
+            if (!isEditMode) return;
+            // Create a mock Leaflet event object to pass to onMapClick
+            const mockEvent = {
+                latlng: {
+                    lat: result.location.y,
+                    lng: result.location.x
+                }
+            };
+            onMapClick(mockEvent);
+        });
     }
 
     function getDistance(lat1, lon1, lat2, lon2) {
@@ -782,6 +808,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isEditMode) {
             // POI Edit Mode
             map.on('click', onMapClick);
+            map.addControl(searchControl);
             sidebarHeaderControls.innerHTML = `
                 <button id="save-guide-btn" class="btn-modern btn-modern-sm" title="Save Changes"><i class="fas fa-save"></i></button>
                 <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit POI Edit Mode"><i class="fas fa-times"></i></button>
@@ -796,6 +823,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // View Mode with options for editors
             map.off('click', onMapClick);
+            map.removeControl(searchControl);
             sidebarHeaderControls.innerHTML = `
                 <button id="edit-guide-details-btn" class="btn-modern btn-modern-sm" title="Edit Guide Details"><i class="fas fa-cog"></i></button>
                 <button id="edit-pois-btn" class="btn-modern btn-modern-sm" title="Edit POIs"><i class="fas fa-map-marker-alt"></i></button>
