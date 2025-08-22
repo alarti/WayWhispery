@@ -583,6 +583,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const marker = L.marker([poi.lat, poi.lon], {
                 draggable: isEditMode
             }).addTo(map).bindPopup(poi.name);
+
+            // If in edit mode, add the drag-end listener to update coordinates
+            if (isEditMode) {
+                marker.on('dragend', (event) => {
+                    const newLatLng = event.target.getLatLng();
+                    const poiToUpdate = pois.find(p => p.id === poi.id);
+                    if (poiToUpdate) {
+                        poiToUpdate.lat = newLatLng.lat;
+                        poiToUpdate.lon = newLatLng.lng;
+                        console.log(`Updated POI ${poi.id} position to: [${newLatLng.lat}, ${newLatLng.lng}]`);
+                        // Redraw the tour route to reflect the new position
+                        drawTourRoute();
+                    }
+                });
+            }
+
             poiMarkers[poi.id] = marker;
         });
     }
