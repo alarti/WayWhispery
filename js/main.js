@@ -744,7 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
         switchSidebarView('map');
 
         if (isMobile()) {
-            document.querySelector('.sidebar').classList.remove('active');
+            document.querySelector('.sidebar').classList.add('collapsed');
         }
     }
 
@@ -869,7 +869,7 @@ document.addEventListener('DOMContentLoaded', () => {
         drawTourRoute();
 
         if (isMobile()) {
-            document.querySelector('.sidebar').classList.remove('active');
+            document.querySelector('.sidebar').classList.add('collapsed');
         }
     }
 
@@ -1982,40 +1982,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Online. Syncing with Supabase...");
 
         try {
-            // Fetch all published guides
-            const { data: guides, error: guidesError } = await supabase
-                .from('guides')
-                .select('*')
-                .eq('status', 'published');
-
-            if (guidesError) throw guidesError;
-
-            // Fetch all POIs for the published guides
-            const guideIds = guides.map(g => g.id);
-            const { data: pois, error: poisError } = await supabase
-                .from('guide_poi')
-                .select('*')
-                .in('guide_id', guideIds);
-
-            if (poisError) throw poisError;
-
-            // Use a transaction to clear and bulk-add data
-            await db.transaction('rw', db.guides, db.guide_poi, async () => {
-                // Clear existing data
-                await db.guides.clear();
-                await db.guide_poi.clear();
-
-                // Add new data
-                await db.guides.bulkAdd(guides);
-                await db.guide_poi.bulkAdd(pois);
-            });
-
-            console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
-
-            // Refresh the guide list now that the sync is complete
-            await fetchAndDisplayGuides();
-
-            // PHASE 2: Sync local mutations back to Supabase
+            // --- PHASE 1: Sync local mutations back to Supabase (Upload) ---
             const localMutations = await db.mutations.orderBy('createdAt').toArray();
             if (localMutations.length > 0) {
                 console.log(`Found ${localMutations.length} local mutations to sync.`);
@@ -2024,6 +1991,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (const mutation of localMutations) {
                     try {
                         let error = null;
+                        // Important: Ensure user is authenticated for mutations
+                        if (!currentUser) {
+                           console.warn("Cannot process mutation, user not logged in. Skipping.");
+                           continue;
+                        }
+
                         switch (mutation.type) {
                             case 'rate_guide':
                                 ({ error } = await supabase.rpc('rate_guide', {
@@ -2032,6 +2005,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }));
                                 break;
                             case 'guide_create':
+                                // Before creating, remove the temp UUID and let the backend assign one
+                                delete mutation.payload.id;
                                 ({ error } = await supabase.from('guides').insert(mutation.payload));
                                 break;
                             case 'poi_upsert':
@@ -2046,20 +2021,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         if (error) {
-                            // Throw to be caught by the catch block
-                            throw error;
+                            // Throw to be caught by the outer catch block for this specific mutation
+                            throw new Error(error.message);
                         } else {
                             // On successful sync, delete the mutation from the outbox
                             await db.mutations.delete(mutation.id);
                             console.log(`Successfully synced mutation ${mutation.id} (${mutation.type}).`);
                         }
-                    } catch (error) {
+                    } catch (err) {
                         failedMutations++;
-                        console.error(`Failed to sync mutation ${mutation.id} (${mutation.type}):`, error);
+                        console.error(`Failed to sync mutation ${mutation.id} (${mutation.type}):`, err);
                         // Update the mutation record with error info instead of stopping
                         await db.mutations.update(mutation.id, {
                             error_count: (mutation.error_count || 0) + 1,
-                            last_error_message: error.message
+                            last_error_message: err.message
                         });
                     }
                 }
@@ -2069,7 +2044,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     console.log("Local mutations sync complete.");
                 }
+            } else {
+                console.log("No local mutations to sync.");
             }
+
+            // --- PHASE 2: Fetch latest data from Supabase (Download) ---
+            console.log("Fetching latest data from Supabase...");
+            // Fetch all published guides and guides created by the current user (drafts)
+            const guideQuery = supabase.from('guides').select('*');
+            if (currentUser) {
+                guideQuery.or(`status.eq.published,and(status.eq.draft,author_id.eq.${currentUser.id})`);
+            } else {
+                guideQuery.eq('status', 'published');
+            }
+            const { data: guides, error: guidesError } = await guideQuery;
+            if (guidesError) throw guidesError;
+
+            // Fetch all POIs for the fetched guides
+            const guideIds = guides.map(g => g.id);
+            let pois = [];
+            if (guideIds.length > 0) {
+                const { data: fetchedPois, error: poisError } = await supabase
+                    .from('guide_poi')
+                    .select('*')
+                    .in('guide_id', guideIds);
+                if (poisError) throw poisError;
+                pois = fetchedPois;
+            }
+
+
+            // Use a transaction to clear and bulk-add data
+            await db.transaction('rw', db.guides, db.guide_poi, async () => {
+                // Clear existing data. We only clear tables that are fully managed by the sync.
+                await db.guides.clear();
+                await db.guide_poi.clear();
+
+                // Add new data
+                if (guides.length > 0) await db.guides.bulkPut(guides);
+                if (pois.length > 0) await db.guide_poi.bulkPut(pois);
+            });
+
+            console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
+
+            // --- PHASE 3: Refresh UI ---
+            // Refresh the guide list now that the sync is complete
+            await fetchAndDisplayGuides();
+
 
         } catch (error) {
             console.error("Supabase sync failed:", error);
