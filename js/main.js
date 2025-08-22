@@ -1332,7 +1332,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function runGuideGeneration(topic) {
-        showFormModal('Generating Guide...', '<div class="loader"></div>', () => {});
+        // Helper to update the modal content
+        const updateLoaderModal = (title, message) => {
+            showFormModal(title, `<p>${message}</p><div class="loader"></div>`, () => {});
+        };
+
+        updateLoaderModal('Generating Guide...', 'Step 1 of 3: Creating guide content with AI...');
 
         const prompt = `
             You are an expert tour guide creator. Your task is to generate a complete tour guide on a given topic, translated into multiple languages.
@@ -1349,8 +1354,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   "default_lang": "en",
                   "available_langs": ["en", "es", "fr", "de", "zh"],
                   "status": "draft",
-                  "initial_lat": 41.8925,
-                  "initial_lon": 12.4853,
+                  "initial_lat": 0.0,
+                  "initial_lon": 0.0,
                   "initial_zoom": 15,
                   "details": {
                     "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." },
@@ -1369,8 +1374,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         "de": { "title": "Titel von POI 1", "description": "Eine sehr detaillierte Beschreibung des POI. Fügen Sie interessante Fakten, historischen Kontext und Kuriositäten über den Ort hinzu.\\n\\nGeschätzte Besuchszeit: 15 Minuten." },
                         "zh": { "title": "POI 1的标题", "description": "关于POI的非常详细的描述。包括有关该地的有趣事实、历史背景和奇闻轶事。\\n\\n预计参观时间：15分钟。" }
                       },
-                      "lat": 41.8925,
-                      "lon": 12.4853
+                      "lat": 0.0,
+                      "lon": 0.0
                     }
                   ]
                 }
@@ -1380,40 +1385,61 @@ document.addEventListener('DOMContentLoaded', () => {
             IMPORTANT INSTRUCTIONS:
             1. Generate a guide with 10 to 15 POIs in a logical walking order.
             2. For EACH POI, the 'description' MUST be very detailed and engaging. Include historical facts, curiosities, and an 'Estimated visit time' on a new line.
-            3. You MUST invent plausible latitude and longitude coordinates for each POI.
-            4. The 'initial_lat' and 'initial_lon' for the guide should be the coordinates of the first POI. 'initial_zoom' should be a sensible value like 15 or 16.
+            3. Set all "lat" and "lon" values to 0.0. The user's application will geocode them later.
+            4. The 'initial_lat' and 'initial_lon' for the guide should also be 0.0.
             5. The 'slug' must be a URL-friendly version of the English title.
         `;
 
         try {
-            const payload = {
-                model: 'openai',
-                messages: [{ role: 'user', content: prompt }]
-            };
-
+            const payload = { model: 'openai', messages: [{ role: 'user', content: prompt }] };
             const response = await fetch('https://text.pollinations.ai/openai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) {
-                throw new Error(`API request failed with status ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
 
             const result = await response.json();
             let jsonResponse = result.choices[0].message.content;
-
-            // Clean the response to ensure it's just a JSON object
             const jsonMatch = jsonResponse.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                throw new Error("AI did not return a valid JSON object.");
-            }
-            jsonResponse = jsonMatch[0];
+            if (!jsonMatch) throw new Error("AI did not return a valid JSON object.");
 
-            // Show the generated JSON in a preview modal
-            hideFormModal(); // Hide the "generating" loader
-            showJsonPreviewModal(jsonResponse);
+            let guideData = JSON.parse(jsonMatch[0]);
+
+            // --- Step 2: Geocode POIs ---
+            updateLoaderModal('Generating Guide...', 'Step 2 of 3: Correcting POI coordinates...');
+            const geoProvider = new GeoSearch.OpenStreetMapProvider();
+            const guide = guideData.guides[0];
+
+            for (let i = 0; i < guide.pois.length; i++) {
+                const poi = guide.pois[i];
+                const poiName = poi.texts.en.title;
+                const poiCity = guide.details.en.title.split(' of ').pop(); // Heuristic to get city from title
+                const query = `${poiName}, ${poiCity}`;
+
+                updateLoaderModal('Correcting Coordinates...', `Searching for: "${poiName}"`);
+                console.log(`[GeoSearch] Searching for: ${query}`);
+
+                const results = await geoProvider.search({ query });
+                if (results && results.length > 0) {
+                    poi.lat = results[0].y;
+                    poi.lon = results[0].x;
+                    console.log(`[GeoSearch] Found: ${poiName} at [${poi.lat}, ${poi.lon}]`);
+                    // Set the guide's initial location to the first POI's location
+                    if (i === 0) {
+                        guide.initial_lat = poi.lat;
+                        guide.initial_lon = poi.lon;
+                    }
+                } else {
+                    console.warn(`[GeoSearch] Could not find coordinates for "${poiName}". Using placeholder 0,0.`);
+                }
+            }
+
+            // --- Step 3: Show Preview ---
+            updateLoaderModal('Generating Guide...', 'Step 3 of 3: Preparing preview...');
+            hideFormModal();
+            showJsonPreviewModal(JSON.stringify(guideData));
 
         } catch (error) {
             hideFormModal();
