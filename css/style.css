@@ -196,6 +196,19 @@ html, body {
     color: var(--ww-text-secondary);
 }
 
+.list-group-item.unlocated-poi {
+    color: #E57373; /* Light red for warning */
+    font-weight: bold;
+}
+
+.list-group-item.unlocated-poi::after {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    content: "\f071"; /* Exclamation triangle */
+    color: #E57373;
+    padding-left: 10px;
+}
+
 /* --- Buttons --- */
 .btn-modern {
     border-radius: 5px;

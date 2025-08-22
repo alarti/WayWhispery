@@ -524,6 +524,10 @@ document.addEventListener('DOMContentLoaded', () => {
             delete poiMarkers[markerId];
         }
         pois.forEach(poi => {
+            // Don't create a marker if the POI has no location.
+            if (poi.lat === 0.0 || poi.lon === 0.0) {
+                return; // Skip to the next POI
+            }
             const marker = L.marker([poi.lat, poi.lon], {
                 draggable: isEditMode
             }).addTo(map).bindPopup(poi.name);
@@ -583,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleRating(guideId, ratingValue) {
         const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
         if (ratedGuides.includes(guideId)) {
-            showMessageDialog('You have already rated this guide.', 'info');
+            await showMessageDialog('You have already rated this guide.', 'info');
             return;
         }
 
@@ -595,10 +599,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (error) {
-                showMessageDialog(`Error submitting rating: ${error.message}`, 'error');
+                await showMessageDialog(`Error submitting rating: ${error.message}`, 'error');
                 return; // Don't proceed if there was an error
             } else {
-                showMessageDialog('Thank you for your rating!', 'success');
+                await showMessageDialog('Thank you for your rating!', 'success');
             }
         } else {
             // Offline: Add to mutations outbox
@@ -607,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload: { guideId, ratingValue },
                 createdAt: new Date()
             });
-            showMessageDialog('You are offline. Your rating has been saved and will be submitted when you reconnect.', 'info');
+            await showMessageDialog('You are offline. Your rating has been saved and will be submitted when you reconnect.', 'info');
         }
 
         // In both cases, mark as rated locally to prevent re-rating
@@ -733,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fetch guide and its POIs from the local Dexie DB
             const guideData = await db.guides.get({ slug: slug });
             if (!guideData) {
-                showMessageDialog('Guide not found in local database. It might not be published or the app is not synced.', 'error');
+                await showMessageDialog('Guide not found in local database. It might not be published or the app is not synced.', 'error');
                 return;
             }
 
@@ -750,7 +754,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tourRoute = pois.map(p => p.id);
         } catch (error) {
             console.error("Error loading guide from local DB:", error);
-            showMessageDialog(`Error loading guide: ${error.message}`, 'error');
+            await showMessageDialog(`Error loading guide: ${error.message}`, 'error');
             return;
         }
 
@@ -842,6 +846,12 @@ document.addEventListener('DOMContentLoaded', () => {
             li.className = 'list-group-item';
             li.dataset.poiId = poi.id;
             li.innerHTML = `<span>${poi.name}</span>`;
+
+            // Add a class if the POI has no coordinates, but only in edit mode
+            if (isEditMode && (poi.lat === 0.0 || poi.lon === 0.0)) {
+                li.classList.add('unlocated-poi');
+            }
+
             if (isEditMode) {
                 const btnGroup = document.createElement('div');
                 btnGroup.className = 'btn-group';
@@ -875,6 +885,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function flyToPoi(poiId) {
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
+
+        // Don't fly to unlocated POIs
+        if (poi.lat === 0.0 || poi.lon === 0.0) {
+            showMessageDialog("This POI has no location. Please set it in edit mode.", "info");
+            return;
+        }
 
         map.flyTo([poi.lat, poi.lon], 17); // Zoom in closer
 
@@ -990,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button type="submit" class="btn-modern">Create and Edit</button>
             </form>`, async (data) => {
             if (!selectedLanguage) {
-                showMessageDialog("A language must be selected to create a guide.", 'error');
+                await showMessageDialog("A language must be selected to create a guide.", 'error');
                 return false;
             }
 
@@ -1021,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Online: Insert into Supabase, then update local
                 const { data: guideData, error } = await supabase.from('guides').insert(newGuideData).select().single();
                 if (error) {
-                    showMessageDialog(`Error creating guide: ${error.message}`, 'error');
+                    await showMessageDialog(`Error creating guide: ${error.message}`, 'error');
                     return false;
                 }
                 await db.guides.put(guideData); // Use put to add/update local
@@ -1034,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload: newGuideData,
                     createdAt: new Date()
                 });
-                showMessageDialog('You are offline. Guide created locally and will be synced when you reconnect.', 'info');
+                await showMessageDialog('You are offline. Guide created locally and will be synced when you reconnect.', 'info');
                 await loadGuide(newGuideData.slug);
             }
 
@@ -1069,10 +1085,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 await db.guide_poi.bulkPut(sectionsToSave);
 
                 poisToDelete = [];
-                showMessageDialog('Guide saved successfully!', 'success');
+                await showMessageDialog('Guide saved successfully!', 'success');
 
             } catch (error) {
-                showMessageDialog(`Error saving guide online: ${error.message}`, 'error');
+                await showMessageDialog(`Error saving guide online: ${error.message}`, 'error');
                 return;
             }
 
@@ -1105,10 +1121,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 poisToDelete = [];
-                showMessageDialog('You are offline. Guide changes saved locally and will be synced when you reconnect.', 'info');
+                await showMessageDialog('You are offline. Guide changes saved locally and will be synced when you reconnect.', 'info');
 
             } catch (error) {
-                showMessageDialog(`Error saving guide offline: ${error.message}`, 'error');
+                await showMessageDialog(`Error saving guide offline: ${error.message}`, 'error');
                 return;
             }
         }
@@ -1155,15 +1171,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 .select();
 
             if (error) {
-                showMessageDialog(`Error updating guide: ${error.message}`, 'error');
+                await showMessageDialog(`Error updating guide: ${error.message}`, 'error');
                 return false;
             }
             if (!responseData || responseData.length === 0) {
-                showMessageDialog("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.", 'error');
+                await showMessageDialog("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.", 'error');
                 return false;
             }
 
-            showMessageDialog('Guide details saved!', 'success');
+            await showMessageDialog('Guide details saved!', 'success');
             await loadGuide(currentGuide.slug); // Reload to see changes
             return true;
         });
@@ -1181,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (navigator.onLine) {
             const { error } = await supabase.from('guides').delete().eq('id', guideId);
             if (error) {
-                showMessageDialog(`Error deleting guide: ${error.message}`, 'error');
+                await showMessageDialog(`Error deleting guide: ${error.message}`, 'error');
                 return;
             }
         } else {
@@ -1196,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await db.guides.delete(guideId);
         await db.guide_poi.where('guide_id').equals(guideId).delete();
 
-        showMessageDialog('Guide deleted. It will be removed permanently on next sync if you are offline.', 'info');
+        await showMessageDialog('Guide deleted. It will be removed permanently on next sync if you are offline.', 'info');
         window.location.reload();
     }
 
@@ -1231,8 +1247,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error("Invalid JSON format: 'guides' array not found.");
             }
         } catch (error) {
-            showMessageDialog(`Error reading file: ${error.message}`, 'error');
-            return;
+            await showMessageDialog(`Error reading file: ${error.message}`, 'error');
+            return { success: false, error: error.message };
         }
 
         const updateLoaderModal = (title, message) => {
@@ -1240,6 +1256,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         updateLoaderModal('Importing Guides...', 'Preparing to import...');
+        let importedGuideSlug = null;
 
         try {
             const totalGuides = parsedData.guides.length;
@@ -1247,6 +1264,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const guide = parsedData.guides[i];
                 const { pois, ...aiGuideData } = guide;
                 const guideTitle = aiGuideData.details?.en?.title || aiGuideData.slug;
+
+                if (i === 0) {
+                    importedGuideSlug = aiGuideData.slug;
+                }
 
                 const progress = `(${i + 1}/${totalGuides})`;
                 updateLoaderModal('Importing...', `Importing guide ${progress}: ${guideTitle}`);
@@ -1294,16 +1315,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             hideFormModal();
-            showMessageDialog('Import complete! Refreshing guides...', 'success');
             // Sync with Supabase to get all the latest changes into the local DB
             await syncWithSupabase();
-            // Switch to the guides view to see the result
-            switchSidebarView('guides');
+            // Return success status and the slug of the first imported guide
+            return { success: true, slug: importedGuideSlug };
 
         } catch (error) {
             hideFormModal();
-            showMessageDialog(`An error occurred during import: ${error.message}`, 'error');
+            await showMessageDialog(`An error occurred during import: ${error.message}`, 'error');
             console.error(error);
+            return { success: false, error: error.message };
         }
     }
 
@@ -1462,22 +1483,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // --- Step 3: Show Preview ---
+            // --- Step 3: Identify unlocated POIs and Show Preview ---
             updateLoaderModal('Generating Guide...', 'Step 3 of 3: Preparing preview...');
+            const unlocatedPois = guide.pois.filter(p => p.lat === 0.0 && p.lon === 0.0);
+
             // After the loop, clean up the temporary field before showing the user
             guide.pois.forEach(p => delete p.location_context);
 
             hideFormModal();
-            showJsonPreviewModal(JSON.stringify(guideData));
+            showJsonPreviewModal(JSON.stringify(guideData), unlocatedPois);
 
         } catch (error) {
             hideFormModal();
-            showMessageDialog(`AI guide generation failed: ${error.message}`, 'error');
+            await showMessageDialog(`AI guide generation failed: ${error.message}`, 'error');
             console.error(error);
         }
     }
 
-    function showJsonPreviewModal(jsonString) {
+    function showJsonPreviewModal(jsonString, unlocatedPois = []) {
         let prettyJson;
         try {
             // Try to format the JSON for better readability.
@@ -1516,9 +1539,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusDiv.style.color = 'red';
             }
         });
-        document.getElementById('import-from-preview-btn').addEventListener('click', () => {
+        document.getElementById('import-from-preview-btn').addEventListener('click', async () => {
             const editedJson = document.getElementById('json-editor-textarea').value;
-            importGuides(editedJson);
+            const importResult = await importGuides(editedJson);
+
+            if (importResult && importResult.success) {
+                if (unlocatedPois.length > 0) {
+                    const poiNames = unlocatedPois.map(p => p.texts.en.title).join(', ');
+                    await showMessageDialog(
+                        `Import complete, but ${unlocatedPois.length} POI(s) could not be geolocated: ${poiNames}. You will now be taken to the editor to fix their locations.`,
+                        'info'
+                    );
+                    // Load the guide and switch to edit mode
+                    await loadGuide(importResult.slug);
+                    setMode('edit');
+                } else {
+                    await showMessageDialog('Guide imported successfully!', 'success');
+                    switchSidebarView('guides');
+                }
+            }
         });
         document.getElementById('export-from-preview-btn').addEventListener('click', () => {
             const editedJson = document.getElementById('json-editor-textarea').value;
@@ -1604,7 +1643,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             hideFormModal();
-            showMessageDialog(`Translation failed: ${error.message}`, 'error');
+            await showMessageDialog(`Translation failed: ${error.message}`, 'error');
         }
     }
 
@@ -1691,12 +1730,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             hideFormModal();
-            showMessageDialog(`Successfully created new guide: "${details.title}". It is saved as a draft.`, 'success');
+            await showMessageDialog(`Successfully created new guide: "${details.title}". It is saved as a draft.`, 'success');
             window.location.reload(); // Reload to see the new guide in the list
 
         } catch (error) {
             hideFormModal();
-            showMessageDialog(`An error occurred during duplication: ${error.message}`, 'error');
+            await showMessageDialog(`An error occurred during duplication: ${error.message}`, 'error');
         }
     }
 
@@ -1739,28 +1778,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showMessageDialog(message, type = 'info') {
-        const dialog = document.getElementById('message-dialog');
-        const text = document.getElementById('message-dialog-text');
-        const closeBtn = document.getElementById('message-dialog-close');
+        return new Promise((resolve) => {
+            const dialog = document.getElementById('message-dialog');
+            const text = document.getElementById('message-dialog-text');
+            const closeBtn = document.getElementById('message-dialog-close');
 
-        text.textContent = message;
+            text.textContent = message;
 
-        // Remove old type classes
-        dialog.classList.remove('success', 'error', 'info');
-        // Add new type class
-        dialog.classList.add(type);
+            // Remove old type classes
+            dialog.classList.remove('success', 'error', 'info');
+            // Add new type class
+            dialog.classList.add(type);
 
-        dialog.classList.remove('hidden');
+            dialog.classList.remove('hidden');
 
-        const closeDialog = () => dialog.classList.add('hidden');
-        closeBtn.onclick = closeDialog;
+            const closeDialog = () => {
+                dialog.classList.add('hidden');
+                // Clean up listeners to avoid memory leaks
+                closeBtn.onclick = null;
+                dialog.onclick = null;
+                resolve(); // Resolve the promise
+            };
 
-        // Also close if clicking the overlay
-        dialog.onclick = (e) => {
-            if (e.target === dialog) {
-                closeDialog();
-            }
-        };
+            closeBtn.onclick = closeDialog;
+            // Also close if clicking the overlay
+            dialog.onclick = (e) => {
+                if (e.target === dialog) {
+                    closeDialog();
+                }
+            };
+        });
     }
 
     // -----------------------------------------------------------------------------
