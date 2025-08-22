@@ -1215,7 +1215,6 @@ document.addEventListener('DOMContentLoaded', () => {
     async function importGuides(json) {
         let parsedData;
         try {
-            // Clean the JSON string to remove common errors like trailing commas
             const cleanedJson = json.replace(/,\s*([\]}])/g, '$1');
             parsedData = JSON.parse(cleanedJson);
             if (!parsedData.guides || !Array.isArray(parsedData.guides)) {
@@ -1226,60 +1225,75 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        showFormModal('Importing...', '<div class="loader"></div>', () => {});
+        const updateLoaderModal = (title, message) => {
+            showFormModal(title, `<p>${message}</p><div class="loader"></div>`, () => {});
+        };
+
+        updateLoaderModal('Importing Guides...', 'Preparing to import...');
 
         try {
-            for (const guide of parsedData.guides) {
+            const totalGuides = parsedData.guides.length;
+            for (let i = 0; i < totalGuides; i++) {
+                const guide = parsedData.guides[i];
                 const { pois, ...aiGuideData } = guide;
+                const guideTitle = aiGuideData.details?.en?.title || aiGuideData.slug;
 
-                // Sanitize and construct the guide object to ensure all required fields are present
+                const progress = `(${i + 1}/${totalGuides})`;
+                updateLoaderModal('Importing...', `Importing guide ${progress}: ${guideTitle}`);
+                console.log(`[Importer] Importing guide ${progress}: ${guideTitle}`);
+
                 const cleanGuideData = {
                     slug: aiGuideData.slug,
                     details: aiGuideData.details,
                     status: aiGuideData.status || 'draft',
                     default_lang: aiGuideData.default_lang || 'en',
                     available_langs: aiGuideData.available_langs || ['en'],
-                    author_id: currentUser.id, // Always set the importer as the author
+                    author_id: currentUser.id,
                     cover_url: aiGuideData.cover_url,
                     initial_lat: aiGuideData.initial_lat,
                     initial_lon: aiGuideData.initial_lon,
                     initial_zoom: aiGuideData.initial_zoom
                 };
 
-                // 1. Upsert the guide itself, using slug as the conflict target
                 const { data: upsertedGuide, error: guideError } = await supabase
                     .from('guides')
                     .upsert(cleanGuideData, { onConflict: 'slug' })
                     .select('id')
                     .single();
 
-                if (guideError || !upsertedGuide) throw new Error(`Failed to import guide "${guideData.slug}": ${guideError?.message}`);
+                if (guideError) throw new Error(`Failed to import guide "${guideTitle}": ${guideError.message}`);
+                if (!upsertedGuide) throw new Error(`No data returned for guide "${guideTitle}" after upsert.`);
 
                 const guideId = upsertedGuide.id;
 
-                // 2. Clear all old POIs for this guide to ensure a clean import
+                console.log(`[Importer] Deleting old POIs for guide ID: ${guideId}`);
                 const { error: deleteError } = await supabase.from('guide_poi').delete().eq('guide_id', guideId);
-                if (deleteError) throw new Error(`Failed to clear old POIs for guide "${guideData.slug}": ${deleteError.message}`);
+                if (deleteError) throw new Error(`Failed to clear old POIs for guide "${guideTitle}": ${deleteError.message}`);
 
-                // 3. Insert the new POIs
                 if (pois && pois.length > 0) {
+                    console.log(`[Importer] Importing ${pois.length} POIs for "${guideTitle}"`);
+                    updateLoaderModal('Importing...', `Importing ${pois.length} POIs for "${guideTitle}"`);
                     const newPois = pois.map(p => {
-                        delete p.id; // Let DB handle the ID
-                        p.guide_id = guideId; // Assign the correct new guide ID
+                        delete p.id;
+                        p.guide_id = guideId;
                         return p;
                     });
                     const { error: poiError } = await supabase.from('guide_poi').insert(newPois);
-                    if (poiError) throw new Error(`Failed to import POIs for guide "${guideData.slug}": ${poiError.message}`);
+                    if (poiError) throw new Error(`Failed to import POIs for guide "${guideTitle}": ${poiError.message}`);
                 }
             }
 
             hideFormModal();
-            alert('Import complete! Reloading to see changes.');
-            window.location.reload();
+            alert('Import complete! Refreshing guides...');
+            // Sync with Supabase to get all the latest changes into the local DB
+            await syncWithSupabase();
+            // Switch to the guides view to see the result
+            switchSidebarView('guides');
 
         } catch (error) {
             hideFormModal();
             alert(`An error occurred during import: ${error.message}`);
+            console.error(error);
         }
     }
 
@@ -1345,7 +1359,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             The topic is: "${topic}".
 
-            The JSON object must follow this exact structure. You MUST provide translations for all 5 languages: en, es, fr, de, zh.
+            The JSON object must follow this exact structure. You MUST provide translations for all 5 languages: en, es, fr, de, zh. For EACH POI, you MUST add the 'location_context' field containing the city and country in Spanish.
 
             {
               "guides": [
@@ -1367,6 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   "pois": [
                     {
                       "order": 1,
+                      "location_context": "Roma, Italia",
                       "texts": {
                         "en": { "title": "POI 1 Title", "description": "A very detailed description of the POI. Include interesting facts, historical context, and curiosities about the place.\\n\\nEstimated visit time: 15 minutes." },
                         "es": { "title": "Título del PDI 1", "description": "Una descripción muy detallada del PDI. Incluye datos interesantes, contexto histórico y curiosidades sobre el lugar.\\n\\nTiempo estimado de visita: 15 minutos." },
@@ -1385,9 +1400,10 @@ document.addEventListener('DOMContentLoaded', () => {
             IMPORTANT INSTRUCTIONS:
             1. Generate a guide with 10 to 15 POIs in a logical walking order.
             2. For EACH POI, the 'description' MUST be very detailed and engaging. Include historical facts, curiosities, and an 'Estimated visit time' on a new line.
-            3. Set all "lat" and "lon" values to 0.0. The user's application will geocode them later.
-            4. The 'initial_lat' and 'initial_lon' for the guide should also be 0.0.
-            5. The 'slug' must be a URL-friendly version of the English title.
+            3. For EACH POI, you MUST add the 'location_context' field. This should contain the city and country of the POI in Spanish (e.g., "Roma, Italia", "París, Francia").
+            4. Set all "lat" and "lon" values to 0.0. The user's application will geocode them later.
+            5. The 'initial_lat' and 'initial_lon' for the guide should also be 0.0.
+            6. The 'slug' must be a URL-friendly version of the English title.
         `;
 
         try {
@@ -1414,9 +1430,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (let i = 0; i < guide.pois.length; i++) {
                 const poi = guide.pois[i];
-                const poiName = poi.texts.es.title; // Use Spanish title for searching
-                const guideCity = guide.details.es.title.split(' de ').pop(); // Heuristic to get city from Spanish title
-                const query = `${poiName}, ${guideCity}`;
+                const poiName = poi.texts.es.title;
+                const locationContext = poi.location_context || ''; // Use the new field
+                const query = `${poiName}, ${locationContext}`;
 
                 updateLoaderModal('Correcting Coordinates...', `Buscando: "${poiName}"`);
                 console.log(`[GeoSearch] Buscando: ${query}`);
@@ -1432,7 +1448,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         guide.initial_lon = poi.lon;
                     }
                 } else {
-                    console.warn(`[GeoSearch] No se encontraron coordenadas para "${poiName}". Usando 0,0 como placeholder.`);
+                    console.warn(`[GeoSearch] No se encontraron coordenadas para "${query}". Usando 0,0 como placeholder.`);
                 }
             }
 
