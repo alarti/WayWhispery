@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isEditMode = false;
     let selectedLanguage = null;
     let poisToDelete = [];
+    let searchControl = null;
 
     const uiStrings = {
         allGuides: { en: 'All Guides', es: 'Todas las Guías', fr: 'Tous les Guides', de: 'Alle Anleitungen', zh: '所有指南' },
@@ -164,7 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     importGuides(e.target.result);
                 } catch (error) {
-                    alert(`Error parsing JSON file: ${error.message}`);
+                    showMessageDialog(`Error parsing JSON file: ${error.message}`, 'error');
                 }
             };
             reader.readAsText(file);
@@ -371,6 +372,31 @@ document.addEventListener('DOMContentLoaded', () => {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         }).addTo(map);
+
+        // Initialize the GeoSearch control
+        const provider = new GeoSearch.OpenStreetMapProvider();
+        searchControl = new GeoSearch.GeoSearchControl({
+            provider: provider,
+            style: 'bar', // 'bar' or 'button'
+            showMarker: true,
+            showPopup: false,
+            autoClose: true,
+            retainZoomLevel: false,
+            animateZoom: true,
+            keepResult: true,
+        });
+
+        map.on('geosearch/showlocation', (result) => {
+            if (!isEditMode) return;
+            // Create a mock Leaflet event object to pass to onMapClick
+            const mockEvent = {
+                latlng: {
+                    lat: result.location.y,
+                    lng: result.location.x
+                }
+            };
+            onMapClick(mockEvent);
+        });
     }
 
     function getDistance(lat1, lon1, lat2, lon2) {
@@ -398,11 +424,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (geolocationId) navigator.geolocation.clearWatch(geolocationId);
         if (navigator.geolocation) {
             geolocationId = navigator.geolocation.watchPosition(showPosition,
-                (err) => { alert(`GPS Error: ${err.message}`); },
+                (err) => { showMessageDialog(`GPS Error: ${err.message}`, 'error'); },
                 { enableHighAccuracy: true }
             );
         } else {
-            alert("Geolocation is not supported by this browser.");
+            showMessageDialog("Geolocation is not supported by this browser.", 'error');
         }
     }
 
@@ -498,6 +524,10 @@ document.addEventListener('DOMContentLoaded', () => {
             delete poiMarkers[markerId];
         }
         pois.forEach(poi => {
+            // Don't create a marker if the POI has no location.
+            if (poi.lat === 0.0 || poi.lon === 0.0) {
+                return; // Skip to the next POI
+            }
             const marker = L.marker([poi.lat, poi.lon], {
                 draggable: isEditMode
             }).addTo(map).bindPopup(poi.name);
@@ -557,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function handleRating(guideId, ratingValue) {
         const ratedGuides = JSON.parse(localStorage.getItem('rated_guides') || '[]');
         if (ratedGuides.includes(guideId)) {
-            alert('You have already rated this guide.');
+            await showMessageDialog('You have already rated this guide.', 'info');
             return;
         }
 
@@ -569,10 +599,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (error) {
-                alert(`Error submitting rating: ${error.message}`);
+                await showMessageDialog(`Error submitting rating: ${error.message}`, 'error');
                 return; // Don't proceed if there was an error
             } else {
-                alert('Thank you for your rating!');
+                await showMessageDialog('Thank you for your rating!', 'success');
             }
         } else {
             // Offline: Add to mutations outbox
@@ -581,7 +611,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload: { guideId, ratingValue },
                 createdAt: new Date()
             });
-            alert('You are offline. Your rating has been saved and will be submitted when you reconnect.');
+            await showMessageDialog('You are offline. Your rating has been saved and will be submitted when you reconnect.', 'info');
         }
 
         // In both cases, mark as rated locally to prevent re-rating
@@ -707,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fetch guide and its POIs from the local Dexie DB
             const guideData = await db.guides.get({ slug: slug });
             if (!guideData) {
-                alert('Guide not found in local database. It might not be published or the app is not synced.');
+                await showMessageDialog('Guide not found in local database. It might not be published or the app is not synced.', 'error');
                 return;
             }
 
@@ -724,7 +754,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tourRoute = pois.map(p => p.id);
         } catch (error) {
             console.error("Error loading guide from local DB:", error);
-            alert(`Error loading guide: ${error.message}`);
+            await showMessageDialog(`Error loading guide: ${error.message}`, 'error');
             return;
         }
 
@@ -744,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
         switchSidebarView('map');
 
         if (isMobile()) {
-            document.querySelector('.sidebar').classList.remove('active');
+            document.querySelector('.sidebar').classList.add('collapsed');
         }
     }
 
@@ -782,6 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isEditMode) {
             // POI Edit Mode
             map.on('click', onMapClick);
+            map.addControl(searchControl);
             sidebarHeaderControls.innerHTML = `
                 <button id="save-guide-btn" class="btn-modern btn-modern-sm" title="Save Changes"><i class="fas fa-save"></i></button>
                 <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit POI Edit Mode"><i class="fas fa-times"></i></button>
@@ -796,6 +827,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             // View Mode with options for editors
             map.off('click', onMapClick);
+            map.removeControl(searchControl);
             sidebarHeaderControls.innerHTML = `
                 <button id="edit-guide-details-btn" class="btn-modern btn-modern-sm" title="Edit Guide Details"><i class="fas fa-cog"></i></button>
                 <button id="edit-pois-btn" class="btn-modern btn-modern-sm" title="Edit POIs"><i class="fas fa-map-marker-alt"></i></button>
@@ -814,6 +846,12 @@ document.addEventListener('DOMContentLoaded', () => {
             li.className = 'list-group-item';
             li.dataset.poiId = poi.id;
             li.innerHTML = `<span>${poi.name}</span>`;
+
+            // Add a class if the POI has no coordinates, but only in edit mode
+            if (isEditMode && (poi.lat === 0.0 || poi.lon === 0.0)) {
+                li.classList.add('unlocated-poi');
+            }
+
             if (isEditMode) {
                 const btnGroup = document.createElement('div');
                 btnGroup.className = 'btn-group';
@@ -848,6 +886,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
 
+        // Don't fly to unlocated POIs
+        if (poi.lat === 0.0 || poi.lon === 0.0) {
+            showMessageDialog("This POI has no location. Please set it in edit mode.", "info");
+            return;
+        }
+
         map.flyTo([poi.lat, poi.lon], 17); // Zoom in closer
 
         const marker = poiMarkers[poi.id];
@@ -869,7 +913,7 @@ document.addEventListener('DOMContentLoaded', () => {
         drawTourRoute();
 
         if (isMobile()) {
-            document.querySelector('.sidebar').classList.remove('active');
+            document.querySelector('.sidebar').classList.add('collapsed');
         }
     }
 
@@ -882,7 +926,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="form-group"><label for="description">Description</label><textarea name="description" rows="3"></textarea></div>
                 <button type="submit" class="btn-modern">Add POI</button>
             </form>`, (data) => {
-            const newPoi = { id: `temp-${Date.now()}`, lat, lon: lng, name: data.name, description: data.description };
+            const newPoi = {
+                id: `temp-${Date.now()}`,
+                lat,
+                lon: lng,
+                texts: {
+                    [currentGuide.current_lang]: { title: data.name, description: data.description }
+                },
+                // For immediate UI refresh
+                name: data.name,
+                description: data.description
+            };
             pois.push(newPoi);
             tourRoute.push(newPoi.id);
             renderPois();
@@ -952,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button type="submit" class="btn-modern">Create and Edit</button>
             </form>`, async (data) => {
             if (!selectedLanguage) {
-                alert("A language must be selected to create a guide.");
+                await showMessageDialog("A language must be selected to create a guide.", 'error');
                 return false;
             }
 
@@ -983,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Online: Insert into Supabase, then update local
                 const { data: guideData, error } = await supabase.from('guides').insert(newGuideData).select().single();
                 if (error) {
-                    alert(`Error creating guide: ${error.message}`);
+                    await showMessageDialog(`Error creating guide: ${error.message}`, 'error');
                     return false;
                 }
                 await db.guides.put(guideData); // Use put to add/update local
@@ -996,7 +1050,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload: newGuideData,
                     createdAt: new Date()
                 });
-                alert('You are offline. Guide created locally and will be synced when you reconnect.');
+                await showMessageDialog('You are offline. Guide created locally and will be synced when you reconnect.', 'info');
                 await loadGuide(newGuideData.slug);
             }
 
@@ -1031,10 +1085,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 await db.guide_poi.bulkPut(sectionsToSave);
 
                 poisToDelete = [];
-                alert('Guide saved successfully!');
+                await showMessageDialog('Guide saved successfully!', 'success');
 
             } catch (error) {
-                alert(`Error saving guide online: ${error.message}`);
+                await showMessageDialog(`Error saving guide online: ${error.message}`, 'error');
                 return;
             }
 
@@ -1067,10 +1121,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 poisToDelete = [];
-                alert('You are offline. Guide changes saved locally and will be synced when you reconnect.');
+                await showMessageDialog('You are offline. Guide changes saved locally and will be synced when you reconnect.', 'info');
 
             } catch (error) {
-                alert(`Error saving guide offline: ${error.message}`);
+                await showMessageDialog(`Error saving guide offline: ${error.message}`, 'error');
                 return;
             }
         }
@@ -1117,15 +1171,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 .select();
 
             if (error) {
-                alert(`Error updating guide: ${error.message}`);
+                await showMessageDialog(`Error updating guide: ${error.message}`, 'error');
                 return false;
             }
             if (!responseData || responseData.length === 0) {
-                alert("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.");
+                await showMessageDialog("Failed to save changes. This may be due to a permissions issue. Please ensure you have the 'editor' role.", 'error');
                 return false;
             }
 
-            alert('Guide details saved!');
+            await showMessageDialog('Guide details saved!', 'success');
             await loadGuide(currentGuide.slug); // Reload to see changes
             return true;
         });
@@ -1143,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (navigator.onLine) {
             const { error } = await supabase.from('guides').delete().eq('id', guideId);
             if (error) {
-                alert(`Error deleting guide: ${error.message}`);
+                await showMessageDialog(`Error deleting guide: ${error.message}`, 'error');
                 return;
             }
         } else {
@@ -1158,7 +1212,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await db.guides.delete(guideId);
         await db.guide_poi.where('guide_id').equals(guideId).delete();
 
-        alert('Guide deleted. It will be removed permanently on next sync if you are offline.');
+        await showMessageDialog('Guide deleted. It will be removed permanently on next sync if you are offline.', 'info');
         window.location.reload();
     }
 
@@ -1187,71 +1241,90 @@ document.addEventListener('DOMContentLoaded', () => {
     async function importGuides(json) {
         let parsedData;
         try {
-            // Clean the JSON string to remove common errors like trailing commas
             const cleanedJson = json.replace(/,\s*([\]}])/g, '$1');
             parsedData = JSON.parse(cleanedJson);
             if (!parsedData.guides || !Array.isArray(parsedData.guides)) {
                 throw new Error("Invalid JSON format: 'guides' array not found.");
             }
         } catch (error) {
-            alert(`Error reading file: ${error.message}`);
-            return;
+            await showMessageDialog(`Error reading file: ${error.message}`, 'error');
+            return { success: false, error: error.message };
         }
 
-        showFormModal('Importing...', '<div class="loader"></div>', () => {});
+        const updateLoaderModal = (title, message) => {
+            showFormModal(title, `<p>${message}</p><div class="loader"></div>`, () => {});
+        };
+
+        updateLoaderModal('Importing Guides...', 'Preparing to import...');
+        let importedGuideSlug = null;
 
         try {
-            for (const guide of parsedData.guides) {
+            const totalGuides = parsedData.guides.length;
+            for (let i = 0; i < totalGuides; i++) {
+                const guide = parsedData.guides[i];
                 const { pois, ...aiGuideData } = guide;
+                const guideTitle = aiGuideData.details?.en?.title || aiGuideData.slug;
 
-                // Sanitize and construct the guide object to ensure all required fields are present
+                if (i === 0) {
+                    importedGuideSlug = aiGuideData.slug;
+                }
+
+                const progress = `(${i + 1}/${totalGuides})`;
+                updateLoaderModal('Importing...', `Importing guide ${progress}: ${guideTitle}`);
+                console.log(`[Importer] Importing guide ${progress}: ${guideTitle}`);
+
                 const cleanGuideData = {
                     slug: aiGuideData.slug,
                     details: aiGuideData.details,
                     status: aiGuideData.status || 'draft',
                     default_lang: aiGuideData.default_lang || 'en',
                     available_langs: aiGuideData.available_langs || ['en'],
-                    author_id: currentUser.id, // Always set the importer as the author
+                    author_id: currentUser.id,
                     cover_url: aiGuideData.cover_url,
                     initial_lat: aiGuideData.initial_lat,
                     initial_lon: aiGuideData.initial_lon,
                     initial_zoom: aiGuideData.initial_zoom
                 };
 
-                // 1. Upsert the guide itself, using slug as the conflict target
                 const { data: upsertedGuide, error: guideError } = await supabase
                     .from('guides')
                     .upsert(cleanGuideData, { onConflict: 'slug' })
                     .select('id')
                     .single();
 
-                if (guideError || !upsertedGuide) throw new Error(`Failed to import guide "${guideData.slug}": ${guideError?.message}`);
+                if (guideError) throw new Error(`Failed to import guide "${guideTitle}": ${guideError.message}`);
+                if (!upsertedGuide) throw new Error(`No data returned for guide "${guideTitle}" after upsert.`);
 
                 const guideId = upsertedGuide.id;
 
-                // 2. Clear all old POIs for this guide to ensure a clean import
+                console.log(`[Importer] Deleting old POIs for guide ID: ${guideId}`);
                 const { error: deleteError } = await supabase.from('guide_poi').delete().eq('guide_id', guideId);
-                if (deleteError) throw new Error(`Failed to clear old POIs for guide "${guideData.slug}": ${deleteError.message}`);
+                if (deleteError) throw new Error(`Failed to clear old POIs for guide "${guideTitle}": ${deleteError.message}`);
 
-                // 3. Insert the new POIs
                 if (pois && pois.length > 0) {
+                    console.log(`[Importer] Importing ${pois.length} POIs for "${guideTitle}"`);
+                    updateLoaderModal('Importing...', `Importing ${pois.length} POIs for "${guideTitle}"`);
                     const newPois = pois.map(p => {
-                        delete p.id; // Let DB handle the ID
-                        p.guide_id = guideId; // Assign the correct new guide ID
+                        delete p.id;
+                        p.guide_id = guideId;
                         return p;
                     });
                     const { error: poiError } = await supabase.from('guide_poi').insert(newPois);
-                    if (poiError) throw new Error(`Failed to import POIs for guide "${guideData.slug}": ${poiError.message}`);
+                    if (poiError) throw new Error(`Failed to import POIs for guide "${guideTitle}": ${poiError.message}`);
                 }
             }
 
             hideFormModal();
-            alert('Import complete! Reloading to see changes.');
-            window.location.reload();
+            // Sync with Supabase to get all the latest changes into the local DB
+            await syncWithSupabase();
+            // Return success status and the slug of the first imported guide
+            return { success: true, slug: importedGuideSlug };
 
         } catch (error) {
             hideFormModal();
-            alert(`An error occurred during import: ${error.message}`);
+            await showMessageDialog(`An error occurred during import: ${error.message}`, 'error');
+            console.error(error);
+            return { success: false, error: error.message };
         }
     }
 
@@ -1304,7 +1377,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function runGuideGeneration(topic) {
-        showFormModal('Generating Guide...', '<div class="loader"></div>', () => {});
+        // Helper to update the modal content
+        const updateLoaderModal = (title, message) => {
+            showFormModal(title, `<p>${message}</p><div class="loader"></div>`, () => {});
+        };
+
+        updateLoaderModal('Generating Guide...', 'Step 1 of 3: Creating guide content with AI...');
 
         const prompt = `
             You are an expert tour guide creator. Your task is to generate a complete tour guide on a given topic, translated into multiple languages.
@@ -1312,7 +1390,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             The topic is: "${topic}".
 
-            The JSON object must follow this exact structure. You MUST provide translations for all 5 languages: en, es, fr, de, zh.
+            The JSON object must follow this exact structure. You MUST provide translations for all 5 languages: en, es, fr, de, zh. For EACH POI, you MUST add the 'location_context' field containing the city and country in Spanish.
 
             {
               "guides": [
@@ -1321,8 +1399,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   "default_lang": "en",
                   "available_langs": ["en", "es", "fr", "de", "zh"],
                   "status": "draft",
-                  "initial_lat": 41.8925,
-                  "initial_lon": 12.4853,
+                  "initial_lat": 0.0,
+                  "initial_lon": 0.0,
                   "initial_zoom": 15,
                   "details": {
                     "en": { "title": "Guide Title in English", "summary": "A brief summary of the guide, in English." },
@@ -1334,6 +1412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   "pois": [
                     {
                       "order": 1,
+                      "location_context": "Roma, Italia",
                       "texts": {
                         "en": { "title": "POI 1 Title", "description": "A very detailed description of the POI. Include interesting facts, historical context, and curiosities about the place.\\n\\nEstimated visit time: 15 minutes." },
                         "es": { "title": "Título del PDI 1", "description": "Una descripción muy detallada del PDI. Incluye datos interesantes, contexto histórico y curiosidades sobre el lugar.\\n\\nTiempo estimado de visita: 15 minutos." },
@@ -1341,8 +1420,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         "de": { "title": "Titel von POI 1", "description": "Eine sehr detaillierte Beschreibung des POI. Fügen Sie interessante Fakten, historischen Kontext und Kuriositäten über den Ort hinzu.\\n\\nGeschätzte Besuchszeit: 15 Minuten." },
                         "zh": { "title": "POI 1的标题", "description": "关于POI的非常详细的描述。包括有关该地的有趣事实、历史背景和奇闻轶事。\\n\\n预计参观时间：15分钟。" }
                       },
-                      "lat": 41.8925,
-                      "lon": 12.4853
+                      "lat": 0.0,
+                      "lon": 0.0
                     }
                   ]
                 }
@@ -1352,49 +1431,76 @@ document.addEventListener('DOMContentLoaded', () => {
             IMPORTANT INSTRUCTIONS:
             1. Generate a guide with 10 to 15 POIs in a logical walking order.
             2. For EACH POI, the 'description' MUST be very detailed and engaging. Include historical facts, curiosities, and an 'Estimated visit time' on a new line.
-            3. You MUST invent plausible latitude and longitude coordinates for each POI.
-            4. The 'initial_lat' and 'initial_lon' for the guide should be the coordinates of the first POI. 'initial_zoom' should be a sensible value like 15 or 16.
-            5. The 'slug' must be a URL-friendly version of the English title.
+            3. For EACH POI, you MUST add the 'location_context' field. This should contain the city and country of the POI in Spanish (e.g., "Roma, Italia", "París, Francia").
+            4. Set all "lat" and "lon" values to 0.0. The user's application will geocode them later.
+            5. The 'initial_lat' and 'initial_lon' for the guide should also be 0.0.
+            6. The 'slug' must be a URL-friendly version of the English title.
         `;
 
         try {
-            const payload = {
-                model: 'openai',
-                messages: [{ role: 'user', content: prompt }]
-            };
-
+            const payload = { model: 'openai', messages: [{ role: 'user', content: prompt }] };
             const response = await fetch('https://text.pollinations.ai/openai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) {
-                throw new Error(`API request failed with status ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
 
             const result = await response.json();
             let jsonResponse = result.choices[0].message.content;
-
-            // Clean the response to ensure it's just a JSON object
             const jsonMatch = jsonResponse.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                throw new Error("AI did not return a valid JSON object.");
-            }
-            jsonResponse = jsonMatch[0];
+            if (!jsonMatch) throw new Error("AI did not return a valid JSON object.");
 
-            // Show the generated JSON in a preview modal
-            hideFormModal(); // Hide the "generating" loader
-            showJsonPreviewModal(jsonResponse);
+            let guideData = JSON.parse(jsonMatch[0]);
+
+            // --- Step 2: Geocode POIs ---
+            updateLoaderModal('Generating Guide...', 'Step 2 of 3: Correcting POI coordinates...');
+            const geoProvider = new GeoSearch.OpenStreetMapProvider();
+            const guide = guideData.guides[0];
+
+            for (let i = 0; i < guide.pois.length; i++) {
+                const poi = guide.pois[i];
+                const poiName = poi.texts.es.title;
+                const locationContext = poi.location_context || ''; // Use the new field
+                const query = `${poiName}, ${locationContext}`;
+
+                updateLoaderModal('Correcting Coordinates...', `Buscando: "${poiName}"`);
+                console.log(`[GeoSearch] Buscando: ${query}`);
+
+                const results = await geoProvider.search({ query });
+                if (results && results.length > 0) {
+                    poi.lat = results[0].y;
+                    poi.lon = results[0].x;
+                    console.log(`[GeoSearch] Encontrado: ${poiName} en [${poi.lat}, ${poi.lon}]`);
+                    // Set the guide's initial location to the first POI's location
+                    if (i === 0) {
+                        guide.initial_lat = poi.lat;
+                        guide.initial_lon = poi.lon;
+                    }
+                } else {
+                    console.warn(`[GeoSearch] No se encontraron coordenadas para "${query}". Usando 0,0 como placeholder.`);
+                }
+            }
+
+            // --- Step 3: Identify unlocated POIs and Show Preview ---
+            updateLoaderModal('Generating Guide...', 'Step 3 of 3: Preparing preview...');
+            const unlocatedPois = guide.pois.filter(p => p.lat === 0.0 && p.lon === 0.0);
+
+            // After the loop, clean up the temporary field before showing the user
+            guide.pois.forEach(p => delete p.location_context);
+
+            hideFormModal();
+            showJsonPreviewModal(JSON.stringify(guideData), unlocatedPois);
 
         } catch (error) {
             hideFormModal();
-            alert(`AI guide generation failed: ${error.message}`);
+            await showMessageDialog(`AI guide generation failed: ${error.message}`, 'error');
             console.error(error);
         }
     }
 
-    function showJsonPreviewModal(jsonString) {
+    function showJsonPreviewModal(jsonString, unlocatedPois = []) {
         let prettyJson;
         try {
             // Try to format the JSON for better readability.
@@ -1433,16 +1539,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusDiv.style.color = 'red';
             }
         });
-        document.getElementById('import-from-preview-btn').addEventListener('click', () => {
+        document.getElementById('import-from-preview-btn').addEventListener('click', async () => {
             const editedJson = document.getElementById('json-editor-textarea').value;
-            importGuides(editedJson);
+            const importResult = await importGuides(editedJson);
+
+            if (importResult && importResult.success) {
+                if (unlocatedPois.length > 0) {
+                    const poiNames = unlocatedPois.map(p => p.texts.en.title).join(', ');
+                    await showMessageDialog(
+                        `Import complete, but ${unlocatedPois.length} POI(s) could not be geolocated: ${poiNames}. You will now be taken to the editor to fix their locations.`,
+                        'info'
+                    );
+                    // Load the guide and switch to edit mode
+                    await loadGuide(importResult.slug);
+                    setMode('edit');
+                } else {
+                    await showMessageDialog('Guide imported successfully!', 'success');
+                    switchSidebarView('guides');
+                }
+            }
         });
         document.getElementById('export-from-preview-btn').addEventListener('click', () => {
             const editedJson = document.getElementById('json-editor-textarea').value;
             try {
                 downloadJson(JSON.parse(editedJson), 'ai-generated-guide.json');
             } catch (error) {
-                alert(`Cannot export invalid JSON. Please fix the errors first.\nError: ${error.message}`);
+                showMessageDialog(`Cannot export invalid JSON. Please fix the errors first.\nError: ${error.message}`, 'error');
             }
         });
     }
@@ -1459,7 +1581,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!optionsHTML) {
-            alert("This guide has already been translated into all supported languages.");
+            showMessageDialog("This guide has already been translated into all supported languages.", 'info');
             return;
         }
 
@@ -1521,7 +1643,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             hideFormModal();
-            alert(`Translation failed: ${error.message}`);
+            await showMessageDialog(`Translation failed: ${error.message}`, 'error');
         }
     }
 
@@ -1608,12 +1730,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             hideFormModal();
-            alert(`Successfully created new guide: "${details.title}". It is saved as a draft.`);
+            await showMessageDialog(`Successfully created new guide: "${details.title}". It is saved as a draft.`, 'success');
             window.location.reload(); // Reload to see the new guide in the list
 
         } catch (error) {
             hideFormModal();
-            alert(`An error occurred during duplication: ${error.message}`);
+            await showMessageDialog(`An error occurred during duplication: ${error.message}`, 'error');
         }
     }
 
@@ -1653,6 +1775,39 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideFormModal() {
         formModal.classList.add('hidden');
         formModalContent.innerHTML = '';
+    }
+
+    function showMessageDialog(message, type = 'info') {
+        return new Promise((resolve) => {
+            const dialog = document.getElementById('message-dialog');
+            const text = document.getElementById('message-dialog-text');
+            const closeBtn = document.getElementById('message-dialog-close');
+
+            text.textContent = message;
+
+            // Remove old type classes
+            dialog.classList.remove('success', 'error', 'info');
+            // Add new type class
+            dialog.classList.add(type);
+
+            dialog.classList.remove('hidden');
+
+            const closeDialog = () => {
+                dialog.classList.add('hidden');
+                // Clean up listeners to avoid memory leaks
+                closeBtn.onclick = null;
+                dialog.onclick = null;
+                resolve(); // Resolve the promise
+            };
+
+            closeBtn.onclick = closeDialog;
+            // Also close if clicking the overlay
+            dialog.onclick = (e) => {
+                if (e.target === dialog) {
+                    closeDialog();
+                }
+            };
+        });
     }
 
     // -----------------------------------------------------------------------------
@@ -1982,40 +2137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Online. Syncing with Supabase...");
 
         try {
-            // Fetch all published guides
-            const { data: guides, error: guidesError } = await supabase
-                .from('guides')
-                .select('*')
-                .eq('status', 'published');
-
-            if (guidesError) throw guidesError;
-
-            // Fetch all POIs for the published guides
-            const guideIds = guides.map(g => g.id);
-            const { data: pois, error: poisError } = await supabase
-                .from('guide_poi')
-                .select('*')
-                .in('guide_id', guideIds);
-
-            if (poisError) throw poisError;
-
-            // Use a transaction to clear and bulk-add data
-            await db.transaction('rw', db.guides, db.guide_poi, async () => {
-                // Clear existing data
-                await db.guides.clear();
-                await db.guide_poi.clear();
-
-                // Add new data
-                await db.guides.bulkAdd(guides);
-                await db.guide_poi.bulkAdd(pois);
-            });
-
-            console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
-
-            // Refresh the guide list now that the sync is complete
-            await fetchAndDisplayGuides();
-
-            // PHASE 2: Sync local mutations back to Supabase
+            // --- PHASE 1: Sync local mutations back to Supabase (Upload) ---
             const localMutations = await db.mutations.orderBy('createdAt').toArray();
             if (localMutations.length > 0) {
                 console.log(`Found ${localMutations.length} local mutations to sync.`);
@@ -2024,6 +2146,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (const mutation of localMutations) {
                     try {
                         let error = null;
+                        // Important: Ensure user is authenticated for mutations
+                        if (!currentUser) {
+                           console.warn("Cannot process mutation, user not logged in. Skipping.");
+                           continue;
+                        }
+
                         switch (mutation.type) {
                             case 'rate_guide':
                                 ({ error } = await supabase.rpc('rate_guide', {
@@ -2032,6 +2160,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }));
                                 break;
                             case 'guide_create':
+                                // Before creating, remove the temp UUID and let the backend assign one
+                                delete mutation.payload.id;
                                 ({ error } = await supabase.from('guides').insert(mutation.payload));
                                 break;
                             case 'poi_upsert':
@@ -2046,20 +2176,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         if (error) {
-                            // Throw to be caught by the catch block
-                            throw error;
+                            // Throw to be caught by the outer catch block for this specific mutation
+                            throw new Error(error.message);
                         } else {
                             // On successful sync, delete the mutation from the outbox
                             await db.mutations.delete(mutation.id);
                             console.log(`Successfully synced mutation ${mutation.id} (${mutation.type}).`);
                         }
-                    } catch (error) {
+                    } catch (err) {
                         failedMutations++;
-                        console.error(`Failed to sync mutation ${mutation.id} (${mutation.type}):`, error);
+                        console.error(`Failed to sync mutation ${mutation.id} (${mutation.type}):`, err);
                         // Update the mutation record with error info instead of stopping
                         await db.mutations.update(mutation.id, {
                             error_count: (mutation.error_count || 0) + 1,
-                            last_error_message: error.message
+                            last_error_message: err.message
                         });
                     }
                 }
@@ -2069,7 +2199,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     console.log("Local mutations sync complete.");
                 }
+            } else {
+                console.log("No local mutations to sync.");
             }
+
+            // --- PHASE 2: Fetch latest data from Supabase (Download) ---
+            console.log("Fetching latest data from Supabase...");
+            // Fetch all published guides and guides created by the current user (drafts)
+            const guideQuery = supabase.from('guides').select('*');
+            if (currentUser) {
+                guideQuery.or(`status.eq.published,and(status.eq.draft,author_id.eq.${currentUser.id})`);
+            } else {
+                guideQuery.eq('status', 'published');
+            }
+            const { data: guides, error: guidesError } = await guideQuery;
+            if (guidesError) throw guidesError;
+
+            // Fetch all POIs for the fetched guides
+            const guideIds = guides.map(g => g.id);
+            let pois = [];
+            if (guideIds.length > 0) {
+                const { data: fetchedPois, error: poisError } = await supabase
+                    .from('guide_poi')
+                    .select('*')
+                    .in('guide_id', guideIds);
+                if (poisError) throw poisError;
+                pois = fetchedPois;
+            }
+
+
+            // Use a transaction to clear and bulk-add data
+            await db.transaction('rw', db.guides, db.guide_poi, async () => {
+                // Clear existing data. We only clear tables that are fully managed by the sync.
+                await db.guides.clear();
+                await db.guide_poi.clear();
+
+                // Add new data
+                if (guides.length > 0) await db.guides.bulkPut(guides);
+                if (pois.length > 0) await db.guide_poi.bulkPut(pois);
+            });
+
+            console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
+
+            // --- PHASE 3: Refresh UI ---
+            // Refresh the guide list now that the sync is complete
+            await fetchAndDisplayGuides();
+
 
         } catch (error) {
             console.error("Supabase sync failed:", error);

@@ -16,6 +16,8 @@
     <link rel="shortcut icon" href="assets/icons/waywispery-icon.jpeg" type="image/jpeg">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Leaflet GeoSearch -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.8.0/dist/geosearch.css"/>
 </head>
 <body>
     <!-- Splash Screen -->
@@ -168,6 +170,14 @@
 
     <input type="file" id="import-guides-input" accept=".json" style="display: none;">
 
+    <!-- Custom Alert/Message Dialog -->
+    <div id="message-dialog" class="modal-overlay hidden">
+        <div class="modal-content">
+            <p id="message-dialog-text"></p>
+            <button id="message-dialog-close" class="btn-modern">OK</button>
+        </div>
+    </div>
+
     <!-- Mobile Debug Console -->
     <button id="mobile-console-toggle" class="btn-modern"><i class="fas fa-bug"></i></button>
     <div id="mobile-console" class="hidden">
@@ -182,6 +192,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
