@@ -898,11 +898,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button id="exit-edit-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Exit POI Edit Mode"><i class="fas fa-times"></i></button>
                 <hr>
                 <button id="export-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Export JSON"><i class="fas fa-file-export"></i></button>
-                <button id="translate-guide-btn" class="btn-modern btn-modern-sm btn-modern-secondary" title="Duplicate & Translate"><i class="fas fa-language"></i></button>
             `;
             sidebarHeaderControls.querySelector('#save-guide-btn').onclick = saveGuide;
             sidebarHeaderControls.querySelector('#export-guide-btn').onclick = exportForTranslation;
-            sidebarHeaderControls.querySelector('#translate-guide-btn').onclick = showAutoTranslateModal;
             sidebarHeaderControls.querySelector('#exit-edit-btn').onclick = () => setMode('view');
         } else {
             // View Mode with options for editors
@@ -1628,7 +1626,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             for (let i = 0; i < guide.pois.length; i++) {
                 const poi = guide.pois[i];
-                const poiName = poi.texts.en.title; // Use English title for better geocoding results
+                const poiName = poi.texts.es.title; // Use Spanish title for geocoding results
                 const locationContext = poi.location_context || ''; // Use the new field
                 const query = `${poiName}, ${locationContext}`;
 
