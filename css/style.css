@@ -768,3 +768,42 @@ html, body {
 #message-dialog.info .modal-content {
     border-left: 5px solid #3498db; /* A nice blue for info */
 }
+
+/* --- Leaflet GeoSearch Bar --- */
+.leaflet-control-geosearch.bar {
+    background-color: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+}
+
+.leaflet-control-geosearch.bar form input {
+    color: #333 !important; /* Use important to override leaflet inline styles */
+    background-color: transparent !important;
+    height: 35px;
+    padding: 0 10px;
+    border: none;
+}
+
+.leaflet-control-geosearch.bar .results {
+    background-color: white;
+    border: 1px solid #ccc;
+    margin-top: 5px;
+    border-radius: 4px;
+}
+
+.leaflet-control-geosearch.bar .results > * {
+    color: #333;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.leaflet-control-geosearch.bar .results > *:hover {
+    background-color: #f0f0f0;
+}
+
+.leaflet-control-geosearch.bar .results .active {
+    background-color: #f0f0f0;
+    font-weight: bold;
+}
