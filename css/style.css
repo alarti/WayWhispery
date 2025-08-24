@@ -793,7 +793,7 @@ html, body {
 }
 
 .leaflet-control-geosearch.bar .results > * {
-    color: #333;
+    color: black;
     padding: 10px;
     border-bottom: 1px solid #eee;
     cursor: pointer;
@@ -806,5 +806,5 @@ html, body {
 .leaflet-control-geosearch.bar .results .active {
     background-color: #f0f0f0;
     font-weight: bold;
-    color: #333;
+    color: black;
 }
