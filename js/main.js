@@ -1038,8 +1038,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="text" name="name" value="${texts.title}" required>
                 </div>
                 <div class="form-group">
-                    <label for="postal_code">Postal Code</label>
-                    <input type="text" name="postal_code" value="${poi.postal_code || ''}">
+                    <label for="city">City</label>
+                    <input type="text" name="city" value="${poi.city || ''}">
                 </div>
                 <div class="form-group">
                     <label for="description">Description</label>
@@ -1079,7 +1079,7 @@ document.addEventListener('DOMContentLoaded', () => {
             poi.description = data.description;
             poi.lat = parseFloat(data.lat) || 0.0;
             poi.lon = parseFloat(data.lon) || 0.0;
-            poi.postal_code = data.postal_code;
+            poi.city = data.city;
 
 
             // Re-render the list to show the new name
@@ -1241,7 +1241,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     texts: poi.texts,
                     lat: poi.lat,
                     lon: poi.lon,
-                    postal_code: poi.postal_code,
+                    city: poi.city,
                     order: index
                 }));
                 if (sectionsToSave.length > 0) {
@@ -1264,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     texts: poi.texts,
                     lat: poi.lat,
                     lon: poi.lon,
-                    postal_code: poi.postal_code,
+                    city: poi.city,
                     order: index
                 }));
                 sectionsToSave.forEach(poi => {
@@ -1565,7 +1565,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             The topic is: "${topic}".
 
-            The JSON object must follow this exact structure. You MUST provide translations for all 5 languages: en, es, fr, de, zh. For EACH POI, you MUST add the 'location_context' field containing the city and country in Spanish, and a 'postal_code'.
+            The JSON object must follow this exact structure. You MUST provide translations for all 5 languages: en, es, fr, de, zh. For EACH POI, you MUST add the 'city' field containing the city, and a 'location_context' field for the country.
 
             {
               "guides": [
@@ -1587,8 +1587,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   "pois": [
                     {
                       "order": 1,
-                      "location_context": "Roma, Italia",
-                      "postal_code": "00186",
+                      "city": "Roma",
+                      "location_context": "Italia",
                       "texts": {
                         "en": { "title": "POI 1 Title", "description": "A very detailed description of the POI. Include interesting facts, historical context, and curiosities about the place.\\n\\nEstimated visit time: 15 minutes." },
                         "es": { "title": "Título del PDI 1", "description": "Una descripción muy detallada del PDI. Incluye datos interesantes, contexto histórico y curiosidades sobre el lugar.\\n\\nTiempo estimado de visita: 15 minutos." },
@@ -1607,7 +1607,7 @@ document.addEventListener('DOMContentLoaded', () => {
             IMPORTANT INSTRUCTIONS:
             1. Generate a guide with 10 to 15 POIs in a logical walking order.
             2. For EACH POI, the 'description' MUST be very detailed and engaging. Include historical facts, curiosities, and an 'Estimated visit time' on a new line.
-            3. For EACH POI, you MUST add the 'location_context' field (city and country in Spanish) AND a 'postal_code' field.
+            3. For EACH POI, you MUST add a 'city' field and a 'location_context' field (for the country).
             4. Set all "lat" and "lon" values to 0.0. The user's application will geocode them later.
             5. The 'initial_lat' and 'initial_lon' for the guide should also be 0.0.
             6. The 'slug' must be a URL-friendly version of the English title.
@@ -1638,9 +1638,9 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = 0; i < guide.pois.length; i++) {
                 const poi = guide.pois[i];
                 const poiName = poi.texts.es.title; // Use Spanish title for geocoding results
+                const city = poi.city || '';
                 const locationContext = poi.location_context || ''; // Use the new field
-                const postalCode = poi.postal_code || '';
-                const query = `${poiName}, ${postalCode}, ${locationContext}`;
+                const query = `${poiName}, ${city}, ${locationContext}`;
 
                 updateLoaderModal('Correcting Coordinates...', `Searching for: "${query}"`);
                 console.log(`[GeoSearch] Searching for: ${query}`);
@@ -1667,7 +1667,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // After the loop, clean up the temporary fields before showing the user
             guide.pois.forEach(p => {
                 delete p.location_context;
-                delete p.postal_code;
+                delete p.city;
             });
 
             hideFormModal();
