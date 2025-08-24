@@ -1709,6 +1709,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const importResult = await importGuides(editedJson);
 
             if (importResult && importResult.success) {
+                hideFormModal(); // Close the preview modal
                 if (unlocatedPois.length > 0) {
                     const poiNames = unlocatedPois.map(p => p.texts.en.title).join(', ');
                     await showMessageDialog(
