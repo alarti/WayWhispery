@@ -1445,7 +1445,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const progress = `(${i + 1}/${totalGuides})`;
-                updateLoaderModal('Importing...', `Importing guide ${progress}: ${guideTitle}`);
+                updateLoaderModal('Importing Guides...', `Importing guide ${progress}: ${guideTitle}`);
                 console.log(`[Importer] Importing guide ${progress}: ${guideTitle}`);
 
                 const cleanGuideData = {
@@ -1478,7 +1478,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (pois && pois.length > 0) {
                     console.log(`[Importer] Importing ${pois.length} POIs for "${guideTitle}"`);
-                    updateLoaderModal('Importing...', `Importing ${pois.length} POIs for "${guideTitle}"`);
+                    updateLoaderModal('Importing Guides...', `Importing ${pois.length} POIs for "${guideTitle}"`);
                     const newPois = pois.map(p => {
                         delete p.id;
                         p.guide_id = guideId;
@@ -1489,9 +1489,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            hideFormModal();
+            updateLoaderModal('Finalizing...', 'Syncing with database...');
             // Sync with Supabase to get all the latest changes into the local DB
             await syncWithSupabase();
+            hideFormModal();
             // Return success status and the slug of the first imported guide
             return { success: true, slug: importedGuideSlug };
 
@@ -1642,7 +1643,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const locationContext = poi.location_context || ''; // Use the new field
                 const query = `${poiName}, ${city}, ${locationContext}`;
 
-                updateLoaderModal('Correcting Coordinates...', `Searching for: "${query}"`);
+                const progress = `(${i + 1}/${guide.pois.length})`;
+                updateLoaderModal('Correcting Coordinates...', `Searching for ${progress}: "${query}"`);
                 console.log(`[GeoSearch] Searching for: ${query}`);
 
                 const results = await geoProvider.search({ query });
@@ -2219,8 +2221,14 @@ document.addEventListener('DOMContentLoaded', () => {
             updateLangButton(lang);
             splashLoader.classList.remove('hidden');
 
-            // Attempt to sync with the backend. This will run in the background.
-            syncWithSupabase();
+            // Attempt to sync with the backend.
+            try {
+                await syncWithSupabase();
+            } catch (error) {
+                console.error("Initial sync failed:", error);
+                showMessageDialog(`Could not sync with the server: ${error.message}. Some data may be outdated.`, 'error');
+            }
+
 
             try {
                 // This logic now only runs once on the first app start
@@ -2317,120 +2325,85 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         console.log("Online. Syncing with Supabase...");
 
-        try {
-            // --- PHASE 1: Sync local mutations back to Supabase (Upload) ---
-            const localMutations = await db.mutations.orderBy('createdAt').toArray();
-            if (localMutations.length > 0) {
-                console.log(`Found ${localMutations.length} local mutations to sync.`);
-                let failedMutations = 0;
+        // --- PHASE 1: Sync local mutations back to Supabase (Upload) ---
+        const localMutations = await db.mutations.orderBy('createdAt').toArray();
+        if (localMutations.length > 0) {
+            console.log(`Found ${localMutations.length} local mutations to sync.`);
 
-                for (const mutation of localMutations) {
-                    try {
-                        let error = null;
-                        // Important: Ensure user is authenticated for mutations
-                        if (!currentUser) {
-                           console.warn("Cannot process mutation, user not logged in. Skipping.");
-                           continue;
-                        }
-
-                        switch (mutation.type) {
-                            case 'rate_guide':
-                                ({ error } = await supabase.rpc('rate_guide', {
-                                    guide_id_to_rate: mutation.payload.guideId,
-                                    rating_value: mutation.payload.ratingValue
-                                }));
-                                break;
-                            case 'guide_create':
-                                // Before creating, remove the temp UUID and let the backend assign one
-                                delete mutation.payload.id;
-                                ({ error } = await supabase.from('guides').insert(mutation.payload));
-                                break;
-                            case 'poi_upsert':
-                                ({ error } = await supabase.from('guide_poi').upsert(mutation.payload));
-                                break;
-                            case 'poi_delete':
-                                ({ error } = await supabase.from('guide_poi').delete().eq('id', mutation.payload.id));
-                                break;
-                            case 'guide_delete':
-                                ({ error } = await supabase.from('guides').delete().eq('id', mutation.payload.id));
-                                break;
-                        }
-
-                        if (error) {
-                            // Throw to be caught by the outer catch block for this specific mutation
-                            throw new Error(error.message);
-                        } else {
-                            // On successful sync, delete the mutation from the outbox
-                            await db.mutations.delete(mutation.id);
-                            console.log(`Successfully synced mutation ${mutation.id} (${mutation.type}).`);
-                        }
-                    } catch (err) {
-                        failedMutations++;
-                        console.error(`Failed to sync mutation ${mutation.id} (${mutation.type}):`, err);
-                        // Update the mutation record with error info instead of stopping
-                        await db.mutations.update(mutation.id, {
-                            error_count: (mutation.error_count || 0) + 1,
-                            last_error_message: err.message
-                        });
-                    }
+            for (const mutation of localMutations) {
+                let error = null;
+                if (!currentUser) {
+                   console.warn("Cannot process mutation, user not logged in. Skipping.");
+                   continue;
                 }
 
-                if (failedMutations > 0) {
-                    alert(`${failedMutations} local changes could not be synced. Please check the console for details.`);
+                switch (mutation.type) {
+                    case 'rate_guide':
+                        ({ error } = await supabase.rpc('rate_guide', {
+                            guide_id_to_rate: mutation.payload.guideId,
+                            rating_value: mutation.payload.ratingValue
+                        }));
+                        break;
+                    case 'guide_create':
+                        delete mutation.payload.id;
+                        ({ error } = await supabase.from('guides').insert(mutation.payload));
+                        break;
+                    case 'poi_upsert':
+                        ({ error } = await supabase.from('guide_poi').upsert(mutation.payload));
+                        break;
+                    case 'poi_delete':
+                        ({ error } = await supabase.from('guide_poi').delete().eq('id', mutation.payload.id));
+                        break;
+                    case 'guide_delete':
+                        ({ error } = await supabase.from('guides').delete().eq('id', mutation.payload.id));
+                        break;
+                }
+
+                if (error) {
+                    throw new Error(`Failed to sync mutation ${mutation.id} (${mutation.type}): ${error.message}`);
                 } else {
-                    console.log("Local mutations sync complete.");
+                    await db.mutations.delete(mutation.id);
+                    console.log(`Successfully synced mutation ${mutation.id} (${mutation.type}).`);
                 }
-            } else {
-                console.log("No local mutations to sync.");
             }
-
-            // --- PHASE 2: Fetch latest data from Supabase (Download) ---
-            console.log("Fetching latest data from Supabase...");
-            // Fetch all published guides and guides created by the current user (drafts)
-            const guideQuery = supabase.from('guides').select('*');
-            if (currentUser) {
-                guideQuery.or(`status.eq.published,and(status.eq.draft,author_id.eq.${currentUser.id})`);
-            } else {
-                guideQuery.eq('status', 'published');
-            }
-            const { data: guides, error: guidesError } = await guideQuery;
-            if (guidesError) throw guidesError;
-
-            // Fetch all POIs for the fetched guides
-            const guideIds = guides.map(g => g.id);
-            let pois = [];
-            if (guideIds.length > 0) {
-                const { data: fetchedPois, error: poisError } = await supabase
-                    .from('guide_poi')
-                    .select('*')
-                    .in('guide_id', guideIds);
-                if (poisError) throw poisError;
-                pois = fetchedPois;
-            }
-
-
-            // Use a transaction to clear and bulk-add data
-            await db.transaction('rw', db.guides, db.guide_poi, async () => {
-                // Clear existing data. We only clear tables that are fully managed by the sync.
-                await db.guides.clear();
-                await db.guide_poi.clear();
-
-                // Add new data
-                if (guides.length > 0) await db.guides.bulkPut(guides);
-                if (pois.length > 0) await db.guide_poi.bulkPut(pois);
-            });
-
-            console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
-
-            // --- PHASE 3: Refresh UI ---
-            // Refresh the guide list now that the sync is complete
-            await fetchAndDisplayGuides();
-
-
-        } catch (error) {
-            console.error("Supabase sync failed:", error);
-            alert(`Data synchronization failed: ${error.message}`);
+            console.log("Local mutations sync complete.");
+        } else {
+            console.log("No local mutations to sync.");
         }
+
+        // --- PHASE 2: Fetch latest data from Supabase (Download) ---
+        console.log("Fetching latest data from Supabase...");
+        const guideQuery = supabase.from('guides').select('*');
+        if (currentUser) {
+            guideQuery.or(`status.eq.published,and(status.eq.draft,author_id.eq.${currentUser.id})`);
+        } else {
+            guideQuery.eq('status', 'published');
+        }
+        const { data: guides, error: guidesError } = await guideQuery;
+        if (guidesError) throw guidesError;
+
+        const guideIds = guides.map(g => g.id);
+        let pois = [];
+        if (guideIds.length > 0) {
+            const { data: fetchedPois, error: poisError } = await supabase
+                .from('guide_poi')
+                .select('*')
+                .in('guide_id', guideIds);
+            if (poisError) throw poisError;
+            pois = fetchedPois;
+        }
+
+        await db.transaction('rw', db.guides, db.guide_poi, async () => {
+            await db.guides.clear();
+            await db.guide_poi.clear();
+            if (guides.length > 0) await db.guides.bulkPut(guides);
+            if (pois.length > 0) await db.guide_poi.bulkPut(pois);
+        });
+
+        console.log(`Sync from Supabase complete. Stored ${guides.length} guides and ${pois.length} POIs locally.`);
+
+        // --- PHASE 3: Refresh UI ---
+        await fetchAndDisplayGuides();
     }
 
     function updateOnlineStatus() {
